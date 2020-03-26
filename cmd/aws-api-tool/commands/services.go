@@ -7,6 +7,7 @@
 package commands
 
 import (
+	"fmt"
 	"io/ioutil"
 	"os"
 	"os/exec"
@@ -75,10 +76,10 @@ func serviceList(cmd *cobra.Command, args []string) error {
 	if err != nil {
 		return err
 	}
-	headers := []string{"Name"}
+	headers := []string{"Name", "API Version"}
 	rows := make([][]string, len(svcs))
 	for x, svc := range svcs {
-		rows[x] = []string{svc.Alias}
+		rows[x] = []string{svc.Alias, svc.APIVersions[0]}
 	}
 	table := tablewriter.NewWriter(os.Stdout)
 	table.SetHeader(headers)
@@ -88,9 +89,8 @@ func serviceList(cmd *cobra.Command, args []string) error {
 }
 
 type Service struct {
-	Alias         string
-	Versions      []string
-	LatestVersion string
+	Alias       string
+	APIVersions []string
 }
 
 func getServices(clonePath string, filteredServices []string) ([]Service, error) {
@@ -117,9 +117,34 @@ func getServices(clonePath string, filteredServices []string) ([]Service, error)
 				continue
 			}
 		}
-		svcs = append(svcs, Service{Alias: fname})
+		versions, err := getServiceAPIVersions(fp)
+		if err != nil {
+			return svcs, err
+		}
+		svcs = append(svcs, Service{Alias: fname, APIVersions: versions})
 	}
 	return svcs, nil
+}
+
+func getServiceAPIVersions(servicePath string) ([]string, error) {
+	versions := []string{}
+	versionDirs, err := ioutil.ReadDir(servicePath)
+	if err != nil {
+		return versions, err
+	}
+	for _, f := range versionDirs {
+		version := f.Name()
+		fp := filepath.Join(servicePath, version)
+		fi, err := os.Lstat(fp)
+		if err != nil {
+			return versions, err
+		}
+		if !fi.IsDir() {
+			return versions, fmt.Errorf("expected to find only directories in service model directory %s but found non-directory %s", servicePath, fp)
+		}
+		versions = append(versions, version)
+	}
+	return versions, nil
 }
 
 // cloneSDKRepo git clone's the aws-sdk-go source repo into the cache and
