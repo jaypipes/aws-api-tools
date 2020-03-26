@@ -68,10 +68,13 @@ func serviceList(cmd *cobra.Command, args []string) error {
 	}
 	// clone the aws-sdk-go repository locally so we can query for service
 	// information in the models/apis/ directories
+	trace("cloning aws-sdk-go to local cache %s ...\n", srcPath)
 	clonePath, err := cloneSDKRepo(srcPath)
 	if err != nil {
 		return err
 	}
+
+	trace("fetching service information from aws-sdk-go ... \n")
 	svcs, err := getServices(clonePath, filteredServices)
 	if err != nil {
 		return err

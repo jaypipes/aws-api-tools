@@ -42,13 +42,20 @@ func init() {
 		fmt.Printf("unable to determine $HOME: %s\n", err)
 		os.Exit(1)
 	}
-	defaultCachePath = filepath.Join(hd, "."+appName)
+	defaultCachePath = filepath.Join(hd, ".cache", appName)
 	rootCmd.PersistentFlags().StringVar(
 		&cachePath, "cache-path", defaultCachePath, "Path to cache directory root",
 	)
 	rootCmd.PersistentFlags().BoolVar(
 		&debug, "debug", false, "Enable or disable debug mode",
 	)
+}
+
+func trace(msg string, args ...interface{}) {
+	if !debug {
+		return
+	}
+	fmt.Printf(msg, args...)
 }
 
 func processRootCmdArgs(cmd *cobra.Command, args []string) error {
