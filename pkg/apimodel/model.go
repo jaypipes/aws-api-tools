@@ -6,6 +6,8 @@
 
 package apimodel
 
+import "strings"
+
 type Metadata struct {
 	APIVersion      string `json:"apiVersion"`
 	ServiceFullName string `json:"serviceFullName"`
@@ -38,9 +40,26 @@ type API struct {
 	Shapes     map[string]Shape     `json:"shapes"`
 }
 
-// Scalars returns the Shapes in the API that are of a non-compound type by
+// GetOperations returns the Shapes in the API that are of a non-compound type
+// by returning a map of the shape name and its underlying simple type
+func (a API) GetOperations(filterMethod string, prefix string) map[string]Operation {
+	res := map[string]Operation{}
+	for opName, op := range a.Operations {
+		method := op.HTTP.Method
+		if filterMethod != "" && filterMethod != method {
+			continue
+		}
+		if prefix != "" && !strings.HasPrefix(opName, prefix) {
+			continue
+		}
+		res[opName] = op
+	}
+	return res
+}
+
+// GetScalars returns the Shapes in the API that are of a non-compound type by
 // returning a map of the shape name and its underlying simple type
-func (a API) Scalars() map[string]string {
+func (a API) GetScalars() map[string]string {
 	res := map[string]string{}
 	for shapeName, shape := range a.Shapes {
 		if shape.Type != "structure" && shape.Type != "list" {
@@ -50,9 +69,9 @@ func (a API) Scalars() map[string]string {
 	return res
 }
 
-// Payloads returns the Shapes in the API that are used as input or output
+// GetPayloads returns the Shapes in the API that are used as input or output
 // payload wrappers
-func (a API) Payloads() map[string]Shape {
+func (a API) GetPayloads() map[string]Shape {
 	res := map[string]Shape{}
 	for _, op := range a.Operations {
 		if op.Input.Shape != nil {
@@ -67,10 +86,11 @@ func (a API) Payloads() map[string]Shape {
 	return res
 }
 
-// Objects returns all Shapes that are structures but are not exception classes
-// and that do not look like they are request or response payload wrappers.
-func (a API) Objects() map[string]Shape {
-	payloads := a.Payloads()
+// GetObjects returns all Shapes that are structures but are not exception
+// classes and that do not look like they are request or response payload
+// wrappers.
+func (a API) GetObjects() map[string]Shape {
+	payloads := a.GetPayloads()
 	res := map[string]Shape{}
 	for shapeName, shape := range a.Shapes {
 		if shape.Type == "structure" && !shape.Exception {
@@ -83,8 +103,8 @@ func (a API) Objects() map[string]Shape {
 	return res
 }
 
-// Exceptions returns all Shapes that are exception classes
-func (a API) Exceptions() map[string]Shape {
+// GetExceptions returns all Shapes that are exception classes
+func (a API) GetExceptions() map[string]Shape {
 	res := map[string]Shape{}
 	for shapeName, shape := range a.Shapes {
 		if shape.Type == "structure" && shape.Exception {

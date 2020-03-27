@@ -17,9 +17,10 @@ import (
 )
 
 var (
-	cliService          string
-	cliHTTPMethodFilter string
-	serviceRef          *Service
+	cliService               string
+	cliHTTPMethodFilter      string
+	cliOperationPrefixFilter string
+	serviceRef               *Service
 )
 
 // apiCmd provides sub-commands for exploring the AWS API models
@@ -74,6 +75,9 @@ func init() {
 	apiCmd.PersistentFlags().StringVarP(
 		&cliService, "service", "s", "", "Alias of the AWS service to work with.",
 	)
+	apiOperationsCmd.PersistentFlags().StringVar(
+		&cliOperationPrefixFilter, "prefix", "", "Filer to operations having a prefix.",
+	)
 	apiOperationsCmd.PersistentFlags().StringVarP(
 		&cliHTTPMethodFilter, "http-method", "m", "", "Filter by HTTP method.",
 	)
@@ -110,10 +114,10 @@ func apiInfo(cmd *cobra.Command, args []string) error {
 }
 
 func printAPIInfo(svc *Service) {
-	objects := svc.API.Objects()
-	scalars := svc.API.Scalars()
-	payloads := svc.API.Payloads()
-	exceptions := svc.API.Exceptions()
+	objects := svc.API.GetObjects()
+	scalars := svc.API.GetScalars()
+	payloads := svc.API.GetPayloads()
+	exceptions := svc.API.GetExceptions()
 	fmt.Printf("Service '%s'\n", svc.Alias)
 	fmt.Printf("  API Version:         %s\n", svc.API.Metadata.APIVersion)
 	fmt.Printf("  Total operations:    %d\n", len(svc.API.Operations))
@@ -133,14 +137,11 @@ func apiOperations(cmd *cobra.Command, args []string) error {
 }
 
 func printAPIOperations(svc *Service) {
-	operations := svc.API.Operations
+	method := strings.ToUpper(cliHTTPMethodFilter)
+	operations := svc.API.GetOperations(method, cliOperationPrefixFilter)
 	headers := []string{"Name", "HTTP Method"}
 	rows := make([][]string, 0)
-	filteredMethod := strings.ToUpper(cliHTTPMethodFilter)
 	for operationName, operation := range operations {
-		if filteredMethod != "" && filteredMethod != operation.HTTP.Method {
-			continue
-		}
 		rows = append(rows, []string{operationName, operation.HTTP.Method})
 	}
 	sort.Slice(rows, func(i, j int) bool {
@@ -161,7 +162,7 @@ func apiObjects(cmd *cobra.Command, args []string) error {
 }
 
 func printAPIObjects(svc *Service) {
-	objects := svc.API.Objects()
+	objects := svc.API.GetObjects()
 	headers := []string{"Name"}
 	rows := make([][]string, len(objects))
 	x := 0
@@ -187,7 +188,7 @@ func apiScalars(cmd *cobra.Command, args []string) error {
 }
 
 func printAPIScalars(svc *Service) {
-	scalars := svc.API.Scalars()
+	scalars := svc.API.GetScalars()
 	headers := []string{"Name", "Type"}
 	rows := make([][]string, len(scalars))
 	x := 0
@@ -213,7 +214,7 @@ func apiPayloads(cmd *cobra.Command, args []string) error {
 }
 
 func printAPIPayloads(svc *Service) {
-	payloads := svc.API.Payloads()
+	payloads := svc.API.GetPayloads()
 	headers := []string{"Name"}
 	rows := make([][]string, len(payloads))
 	x := 0
@@ -239,7 +240,7 @@ func apiExceptions(cmd *cobra.Command, args []string) error {
 }
 
 func printAPIExceptions(svc *Service) {
-	exceptions := svc.API.Exceptions()
+	exceptions := svc.API.GetExceptions()
 	headers := []string{"Name"}
 	rows := make([][]string, len(exceptions))
 	x := 0
