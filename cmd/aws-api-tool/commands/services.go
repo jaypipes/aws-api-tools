@@ -17,6 +17,8 @@ import (
 
 	"github.com/olekukonko/tablewriter"
 	"github.com/spf13/cobra"
+
+	"github.com/jaypipes/aws-api-tools/pkg/apimodel"
 )
 
 const (
@@ -62,21 +64,28 @@ func processFilteredServices() {
 	}
 }
 
-func serviceList(cmd *cobra.Command, args []string) error {
+func ensureSDKRepo() (string, error) {
 	srcPath := filepath.Join(cachePath, "src")
 	if err := os.MkdirAll(srcPath, os.ModePerm); err != nil {
-		return err
+		return "", err
 	}
 	// clone the aws-sdk-go repository locally so we can query for service
 	// information in the models/apis/ directories
 	trace("cloning aws-sdk-go to local cache %s ...\n", srcPath)
 	clonePath, err := cloneSDKRepo(srcPath)
 	if err != nil {
+		return "", err
+	}
+	return clonePath, nil
+}
+
+func serviceList(cmd *cobra.Command, args []string) error {
+	sdkPath, err := ensureSDKRepo()
+	if err != nil {
 		return err
 	}
-
 	trace("fetching service information from aws-sdk-go ... \n")
-	svcs, err := getServices(clonePath, filteredServices)
+	svcs, err := getServices(sdkPath, filteredServices)
 	if err != nil {
 		return err
 	}
@@ -85,8 +94,8 @@ func serviceList(cmd *cobra.Command, args []string) error {
 	for x, svc := range svcs {
 		rows[x] = []string{
 			svc.Alias,
-			svc.APIModel.Metadata.APIVersion,
-			svc.APIModel.Metadata.ServiceFullName,
+			svc.API.Metadata.APIVersion,
+			svc.API.Metadata.ServiceFullName,
 		}
 	}
 	table := tablewriter.NewWriter(os.Stdout)
@@ -96,25 +105,16 @@ func serviceList(cmd *cobra.Command, args []string) error {
 	return nil
 }
 
-type APIModelMetadata struct {
-	APIVersion      string `json:"apiVersion"`
-	ServiceFullName string `json:"serviceFullName"`
-}
-
-type APIModel struct {
-	Metadata APIModelMetadata `json:"metadata"`
-}
-
 type Service struct {
-	Alias    string
-	APIModel APIModel
+	Alias string
+	API   apimodel.API
 }
 
 // getServices returns a slice of Service objects representing the AWS service
 // APIs listed in the models/apis/ directory of the aws-sdk-go repository
 func getServices(
 	clonePath string,
-	filteredServices []string,
+	filtered []string,
 ) ([]Service, error) {
 	svcs := []Service{}
 
@@ -134,23 +134,36 @@ func getServices(
 			continue
 		}
 		// Filter just the services we're interested in
-		if cliServices != "" {
-			if !inFilteredServices(fname) {
-				continue
-			}
+		if !inFiltered(fname, filtered) {
+			continue
 		}
 		version, err := getServiceAPIVersion(fp)
 		if err != nil {
 			return svcs, err
 		}
 		versionPath := filepath.Join(fp, version)
-		model, err := getServiceAPIModel(versionPath)
+		api, err := getServiceAPI(versionPath)
 		if err != nil {
 			return svcs, err
 		}
-		svcs = append(svcs, Service{Alias: fname, APIModel: model})
+		svcs = append(svcs, Service{Alias: fname, API: api})
 	}
 	return svcs, nil
+}
+
+// getService returns a Service object representing a specified AWS service
+func getService(
+	clonePath string,
+	serviceAlias string,
+) (Service, error) {
+	svcs, err := getServices(clonePath, []string{serviceAlias})
+	if err != nil {
+		return Service{}, err
+	}
+	if len(svcs) == 0 {
+		return Service{}, fmt.Errorf("unknown service %s", serviceAlias)
+	}
+	return svcs[0], nil
 }
 
 func getServiceAPIVersion(servicePath string) (string, error) {
@@ -175,11 +188,11 @@ func getServiceAPIVersion(servicePath string) (string, error) {
 	return "", fmt.Errorf("expected to find at least one directory in service model directory %s", servicePath)
 }
 
-func getServiceAPIModel(versionPath string) (APIModel, error) {
+func getServiceAPI(versionPath string) (apimodel.API, error) {
 	// in each models/apis/$service/$version/ directory will exist files like
 	// api-2.json, docs-2.json, etc. We want to grab the API model from the
 	// api-2.json file
-	model := APIModel{}
+	model := apimodel.API{}
 	modelPath := filepath.Join(versionPath, "api-2.json")
 	if _, err := os.Stat(modelPath); os.IsNotExist(err) {
 		return model, fmt.Errorf("expected to find %s", modelPath)
@@ -202,9 +215,9 @@ func cloneSDKRepo(srcPath string) (string, error) {
 	return clonePath, nil
 }
 
-func inFilteredServices(service string) bool {
-	for _, s := range filteredServices {
-		if s == service {
+func inFiltered(subject string, filtered []string) bool {
+	for _, s := range filtered {
+		if s == subject {
 			return true
 		}
 	}
