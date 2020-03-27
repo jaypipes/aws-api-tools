@@ -7,6 +7,7 @@
 package commands
 
 import (
+	"encoding/json"
 	"fmt"
 	"io/ioutil"
 	"os"
@@ -79,10 +80,14 @@ func serviceList(cmd *cobra.Command, args []string) error {
 	if err != nil {
 		return err
 	}
-	headers := []string{"Name", "API Version"}
+	headers := []string{"Alias", "API Version", "Full Name"}
 	rows := make([][]string, len(svcs))
 	for x, svc := range svcs {
-		rows[x] = []string{svc.Alias, svc.APIVersions[0]}
+		rows[x] = []string{
+			svc.Alias,
+			svc.APIModel.Metadata.APIVersion,
+			svc.APIModel.Metadata.ServiceFullName,
+		}
 	}
 	table := tablewriter.NewWriter(os.Stdout)
 	table.SetHeader(headers)
@@ -91,12 +96,26 @@ func serviceList(cmd *cobra.Command, args []string) error {
 	return nil
 }
 
-type Service struct {
-	Alias       string
-	APIVersions []string
+type APIModelMetadata struct {
+	APIVersion      string `json:"apiVersion"`
+	ServiceFullName string `json:"serviceFullName"`
 }
 
-func getServices(clonePath string, filteredServices []string) ([]Service, error) {
+type APIModel struct {
+	Metadata APIModelMetadata `json:"metadata"`
+}
+
+type Service struct {
+	Alias    string
+	APIModel APIModel
+}
+
+// getServices returns a slice of Service objects representing the AWS service
+// APIs listed in the models/apis/ directory of the aws-sdk-go repository
+func getServices(
+	clonePath string,
+	filteredServices []string,
+) ([]Service, error) {
 	svcs := []Service{}
 
 	destPath := filepath.Join(clonePath, "models", "apis")
@@ -120,34 +139,56 @@ func getServices(clonePath string, filteredServices []string) ([]Service, error)
 				continue
 			}
 		}
-		versions, err := getServiceAPIVersions(fp)
+		version, err := getServiceAPIVersion(fp)
 		if err != nil {
 			return svcs, err
 		}
-		svcs = append(svcs, Service{Alias: fname, APIVersions: versions})
+		versionPath := filepath.Join(fp, version)
+		model, err := getServiceAPIModel(versionPath)
+		if err != nil {
+			return svcs, err
+		}
+		svcs = append(svcs, Service{Alias: fname, APIModel: model})
 	}
 	return svcs, nil
 }
 
-func getServiceAPIVersions(servicePath string) ([]string, error) {
-	versions := []string{}
+func getServiceAPIVersion(servicePath string) (string, error) {
 	versionDirs, err := ioutil.ReadDir(servicePath)
 	if err != nil {
-		return versions, err
+		return "", err
 	}
 	for _, f := range versionDirs {
 		version := f.Name()
 		fp := filepath.Join(servicePath, version)
 		fi, err := os.Lstat(fp)
 		if err != nil {
-			return versions, err
+			return "", err
 		}
 		if !fi.IsDir() {
-			return versions, fmt.Errorf("expected to find only directories in service model directory %s but found non-directory %s", servicePath, fp)
+			return "", fmt.Errorf("expected to find only directories in service model directory %s but found non-directory %s", servicePath, fp)
 		}
-		versions = append(versions, version)
+		// TODO(jaypipes): handle more than one version? doesn't seem like
+		// there is ever more than one.
+		return version, nil
 	}
-	return versions, nil
+	return "", fmt.Errorf("expected to find at least one directory in service model directory %s", servicePath)
+}
+
+func getServiceAPIModel(versionPath string) (APIModel, error) {
+	// in each models/apis/$service/$version/ directory will exist files like
+	// api-2.json, docs-2.json, etc. We want to grab the API model from the
+	// api-2.json file
+	model := APIModel{}
+	modelPath := filepath.Join(versionPath, "api-2.json")
+	if _, err := os.Stat(modelPath); os.IsNotExist(err) {
+		return model, fmt.Errorf("expected to find %s", modelPath)
+	}
+	b, err := ioutil.ReadFile(modelPath)
+	if err = json.Unmarshal(b, &model); err != nil {
+		return model, err
+	}
+	return model, err
 }
 
 // cloneSDKRepo git clone's the aws-sdk-go source repo into the cache and
