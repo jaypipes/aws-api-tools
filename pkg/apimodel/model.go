@@ -15,7 +15,13 @@ type InputOutputException struct {
 	Shape *string `json:"shape",omitempty`
 }
 
+type HTTP struct {
+	Method     string `json:"method"`
+	RequestURI string `json:"requestUri"`
+}
+
 type Operation struct {
+	HTTP   HTTP                   `json:"http"`
 	Input  InputOutputException   `json:"input"`
 	Output InputOutputException   `json:"output"`
 	Errors []InputOutputException `json:"errors"`
