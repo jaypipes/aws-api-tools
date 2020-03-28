@@ -76,10 +76,10 @@ func init() {
 		&cliService, "service", "s", "", "Alias of the AWS service to work with.",
 	)
 	apiOperationsCmd.PersistentFlags().StringVar(
-		&cliOperationPrefixFilter, "prefix", "", "Filer to operations having a prefix.",
+		&cliOperationPrefixFilter, "prefix", "", "Comma-delimited list of string prefixes to filter operations by.",
 	)
 	apiOperationsCmd.PersistentFlags().StringVarP(
-		&cliHTTPMethodFilter, "http-method", "m", "", "Filter by HTTP method.",
+		&cliHTTPMethodFilter, "method", "m", "", "Comma-delimited list of HTTP methods to filter operations by.",
 	)
 	apiCmd.MarkFlagRequired("service")
 	apiCmd.AddCommand(apiInfoCmd)
@@ -137,8 +137,9 @@ func apiOperations(cmd *cobra.Command, args []string) error {
 }
 
 func printAPIOperations(svc *Service) {
-	method := strings.ToUpper(cliHTTPMethodFilter)
-	operations := svc.API.GetOperations(method, cliOperationPrefixFilter)
+	filterMethods := strings.Split(strings.ToUpper(cliHTTPMethodFilter), ",")
+	filterPrefixes := strings.Split(cliOperationPrefixFilter, ",")
+	operations := svc.API.GetOperations(filterMethods, filterPrefixes)
 	headers := []string{"Name", "HTTP Method"}
 	rows := make([][]string, 0)
 	for operationName, operation := range operations {

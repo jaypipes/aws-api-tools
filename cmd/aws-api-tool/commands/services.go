@@ -134,7 +134,7 @@ func getServices(
 			continue
 		}
 		// Filter just the services we're interested in
-		if !inFiltered(fname, filtered) {
+		if !inStrings(fname, filtered) {
 			continue
 		}
 		version, err := getServiceAPIVersion(fp)
@@ -215,8 +215,8 @@ func cloneSDKRepo(srcPath string) (string, error) {
 	return clonePath, nil
 }
 
-func inFiltered(subject string, filtered []string) bool {
-	for _, s := range filtered {
+func inStrings(subject string, collection []string) bool {
+	for _, s := range collection {
 		if s == subject {
 			return true
 		}
