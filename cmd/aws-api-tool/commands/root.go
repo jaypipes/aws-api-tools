@@ -58,6 +58,13 @@ func trace(msg string, args ...interface{}) {
 	fmt.Printf(msg, args...)
 }
 
+func noResults(rows [][]string) {
+	if len(rows) == 0 {
+		fmt.Println("No results found.")
+		os.Exit(0)
+	}
+}
+
 func processRootCmdArgs(cmd *cobra.Command, args []string) error {
 	if err := processCachePath(); err != nil {
 		return err

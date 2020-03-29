@@ -128,6 +128,7 @@ func printAPIInfo(svc *Service) {
 	scalars := svc.API.GetScalars()
 	payloads := svc.API.GetPayloads()
 	exceptions := svc.API.GetExceptions()
+	lists := svc.API.GetLists()
 	fmt.Printf("Service '%s'\n", svc.Alias)
 	fmt.Printf("  API Version:         %s\n", svc.API.Metadata.APIVersion)
 	fmt.Printf("  Total operations:    %d\n", len(ops))
@@ -135,6 +136,7 @@ func printAPIInfo(svc *Service) {
 	fmt.Printf("  Total objects:       %d\n", len(objects))
 	fmt.Printf("  Total payloads:      %d\n", len(payloads))
 	fmt.Printf("  Total exceptions:    %d\n", len(exceptions))
+	fmt.Printf("  Total lists:         %d\n", len(lists))
 }
 
 func apiOperations(cmd *cobra.Command, args []string) error {
@@ -160,6 +162,7 @@ func printAPIOperations(svc *Service) {
 	for x, operation := range operations {
 		rows[x] = []string{operation.Name, operation.Method}
 	}
+	noResults(rows)
 	sort.Slice(rows, func(i, j int) bool {
 		return rows[i][0] < rows[j][0]
 	})
@@ -184,6 +187,7 @@ func printAPIObjects(svc *Service) {
 	for x, object := range objects {
 		rows[x] = []string{object.Name}
 	}
+	noResults(rows)
 	sort.Slice(rows, func(i, j int) bool {
 		return rows[i][0] < rows[j][0]
 	})
@@ -208,6 +212,7 @@ func printAPIScalars(svc *Service) {
 	for x, scalar := range scalars {
 		rows[x] = []string{scalar.Name, scalar.Type}
 	}
+	noResults(rows)
 	sort.Slice(rows, func(i, j int) bool {
 		return rows[i][0] < rows[j][0]
 	})
@@ -232,6 +237,7 @@ func printAPIPayloads(svc *Service) {
 	for x, payload := range payloads {
 		rows[x] = []string{payload.Name}
 	}
+	noResults(rows)
 	sort.Slice(rows, func(i, j int) bool {
 		return rows[i][0] < rows[j][0]
 	})
@@ -256,6 +262,7 @@ func printAPIExceptions(svc *Service) {
 	for x, exception := range exceptions {
 		rows[x] = []string{exception.Name}
 	}
+	noResults(rows)
 	sort.Slice(rows, func(i, j int) bool {
 		return rows[i][0] < rows[j][0]
 	})
@@ -280,6 +287,7 @@ func printAPILists(svc *Service) {
 	for x, list := range lists {
 		rows[x] = []string{list.Name}
 	}
+	noResults(rows)
 	sort.Slice(rows, func(i, j int) bool {
 		return rows[i][0] < rows[j][0]
 	})
