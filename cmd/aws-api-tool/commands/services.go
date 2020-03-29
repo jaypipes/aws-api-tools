@@ -207,6 +207,9 @@ func cloneSDKRepo(srcPath string) (string, error) {
 }
 
 func inStrings(subject string, collection []string) bool {
+	if len(collection) == 0 {
+		return true
+	}
 	for _, s := range collection {
 		if s == subject {
 			return true

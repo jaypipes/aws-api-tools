@@ -31,9 +31,6 @@ var rootCmd = &cobra.Command{
 	Short: appShortDesc,
 	Long:  appLongDesc,
 	Args:  processRootCmdArgs,
-	Run: func(cmd *cobra.Command, args []string) {
-		// Do Stuff Here
-	},
 }
 
 func init() {
