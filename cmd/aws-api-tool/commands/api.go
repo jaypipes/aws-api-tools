@@ -33,42 +33,42 @@ var apiCmd = &cobra.Command{
 // apiInfoCmd shows summary information for one or more AWS API service models
 var apiInfoCmd = &cobra.Command{
 	Use:   "info",
-	Short: "shows summary information for one or more AWS API service models",
+	Short: "shows summary information for an AWS service API",
 	RunE:  apiInfo,
 }
 
 // apiOperationsCmd lists all operations for an AWS API service
 var apiOperationsCmd = &cobra.Command{
 	Use:   "operations",
-	Short: "lists operations for an AWS API service",
+	Short: "lists Operations for an AWS API service",
 	RunE:  apiOperations,
 }
 
 // apiObjectsCmd lists all scalar types for an AWS API service
 var apiObjectsCmd = &cobra.Command{
 	Use:   "objects",
-	Short: "lists object types for an AWS API service",
+	Short: "lists Object types for an AWS API service",
 	RunE:  apiObjects,
 }
 
 // apiScalarsCmd lists all scalar types for an AWS API service
 var apiScalarsCmd = &cobra.Command{
 	Use:   "scalars",
-	Short: "lists scalar types for an AWS API service",
+	Short: "lists Scalar types for an AWS API service",
 	RunE:  apiScalars,
 }
 
 // apiPayloadsCmd lists all scalar types for an AWS API service
 var apiPayloadsCmd = &cobra.Command{
 	Use:   "payloads",
-	Short: "lists payload types for an AWS API service",
+	Short: "lists Payload types for an AWS API service",
 	RunE:  apiPayloads,
 }
 
 // apiExceptionsCmd lists all scalar types for an AWS API service
 var apiExceptionsCmd = &cobra.Command{
 	Use:   "exceptions",
-	Short: "lists exception types for an AWS API service",
+	Short: "lists Exception types for an AWS API service",
 	RunE:  apiExceptions,
 }
 
