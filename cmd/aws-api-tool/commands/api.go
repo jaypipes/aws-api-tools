@@ -12,6 +12,7 @@ import (
 	"sort"
 	"strings"
 
+	"github.com/jaypipes/aws-api-tools/pkg/apimodel"
 	"github.com/olekukonko/tablewriter"
 	"github.com/spf13/cobra"
 )
@@ -114,14 +115,14 @@ func apiInfo(cmd *cobra.Command, args []string) error {
 }
 
 func printAPIInfo(svc *Service) {
+	ops := svc.API.GetOperations(nil)
 	objects := svc.API.GetObjects()
 	scalars := svc.API.GetScalars()
 	payloads := svc.API.GetPayloads()
 	exceptions := svc.API.GetExceptions()
 	fmt.Printf("Service '%s'\n", svc.Alias)
 	fmt.Printf("  API Version:         %s\n", svc.API.Metadata.APIVersion)
-	fmt.Printf("  Total operations:    %d\n", len(svc.API.Operations))
-	fmt.Printf("  Total shapes:        %d\n", len(svc.API.Shapes))
+	fmt.Printf("  Total operations:    %d\n", len(ops))
 	fmt.Printf("  Total scalars:       %d\n", len(scalars))
 	fmt.Printf("  Total objects:       %d\n", len(objects))
 	fmt.Printf("  Total payloads:      %d\n", len(payloads))
@@ -137,13 +138,19 @@ func apiOperations(cmd *cobra.Command, args []string) error {
 }
 
 func printAPIOperations(svc *Service) {
-	filterMethods := strings.Split(strings.ToUpper(cliHTTPMethodFilter), ",")
-	filterPrefixes := strings.Split(cliOperationPrefixFilter, ",")
-	operations := svc.API.GetOperations(filterMethods, filterPrefixes)
+	filter := &apimodel.OperationFilter{}
+	if cliHTTPMethodFilter != "" {
+		filter.Methods = strings.Split(strings.ToUpper(cliHTTPMethodFilter), ",")
+
+	}
+	if cliOperationPrefixFilter != "" {
+		filter.Prefixes = strings.Split(cliOperationPrefixFilter, ",")
+	}
+	operations := svc.API.GetOperations(filter)
 	headers := []string{"Name", "HTTP Method"}
-	rows := make([][]string, 0)
-	for operationName, operation := range operations {
-		rows = append(rows, []string{operationName, operation.HTTP.Method})
+	rows := make([][]string, len(operations))
+	for x, operation := range operations {
+		rows[x] = []string{operation.Name, operation.Method}
 	}
 	sort.Slice(rows, func(i, j int) bool {
 		return rows[i][0] < rows[j][0]
@@ -166,10 +173,8 @@ func printAPIObjects(svc *Service) {
 	objects := svc.API.GetObjects()
 	headers := []string{"Name"}
 	rows := make([][]string, len(objects))
-	x := 0
-	for objectName, _ := range objects {
-		rows[x] = []string{objectName}
-		x++
+	for x, object := range objects {
+		rows[x] = []string{object.Name}
 	}
 	sort.Slice(rows, func(i, j int) bool {
 		return rows[i][0] < rows[j][0]
@@ -192,10 +197,8 @@ func printAPIScalars(svc *Service) {
 	scalars := svc.API.GetScalars()
 	headers := []string{"Name", "Type"}
 	rows := make([][]string, len(scalars))
-	x := 0
-	for scalarName, scalarType := range scalars {
-		rows[x] = []string{scalarName, scalarType}
-		x++
+	for x, scalar := range scalars {
+		rows[x] = []string{scalar.Name, scalar.Type}
 	}
 	sort.Slice(rows, func(i, j int) bool {
 		return rows[i][0] < rows[j][0]
@@ -218,10 +221,8 @@ func printAPIPayloads(svc *Service) {
 	payloads := svc.API.GetPayloads()
 	headers := []string{"Name"}
 	rows := make([][]string, len(payloads))
-	x := 0
-	for payloadName, _ := range payloads {
-		rows[x] = []string{payloadName}
-		x++
+	for x, payload := range payloads {
+		rows[x] = []string{payload.Name}
 	}
 	sort.Slice(rows, func(i, j int) bool {
 		return rows[i][0] < rows[j][0]
@@ -244,10 +245,8 @@ func printAPIExceptions(svc *Service) {
 	exceptions := svc.API.GetExceptions()
 	headers := []string{"Name"}
 	rows := make([][]string, len(exceptions))
-	x := 0
-	for exceptionName, _ := range exceptions {
-		rows[x] = []string{exceptionName}
-		x++
+	for x, exception := range exceptions {
+		rows[x] = []string{exception.Name}
 	}
 	sort.Slice(rows, func(i, j int) bool {
 		return rows[i][0] < rows[j][0]

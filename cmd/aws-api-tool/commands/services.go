@@ -7,7 +7,6 @@
 package commands
 
 import (
-	"encoding/json"
 	"fmt"
 	"io/ioutil"
 	"os"
@@ -107,7 +106,7 @@ func serviceList(cmd *cobra.Command, args []string) error {
 
 type Service struct {
 	Alias string
-	API   apimodel.API
+	API   *apimodel.API
 }
 
 // getServices returns a slice of Service objects representing the AWS service
@@ -188,20 +187,12 @@ func getServiceAPIVersion(servicePath string) (string, error) {
 	return "", fmt.Errorf("expected to find at least one directory in service model directory %s", servicePath)
 }
 
-func getServiceAPI(versionPath string) (apimodel.API, error) {
+func getServiceAPI(versionPath string) (*apimodel.API, error) {
 	// in each models/apis/$service/$version/ directory will exist files like
 	// api-2.json, docs-2.json, etc. We want to grab the API model from the
 	// api-2.json file
-	model := apimodel.API{}
 	modelPath := filepath.Join(versionPath, "api-2.json")
-	if _, err := os.Stat(modelPath); os.IsNotExist(err) {
-		return model, fmt.Errorf("expected to find %s", modelPath)
-	}
-	b, err := ioutil.ReadFile(modelPath)
-	if err = json.Unmarshal(b, &model); err != nil {
-		return model, err
-	}
-	return model, err
+	return apimodel.ParseFrom(modelPath)
 }
 
 // cloneSDKRepo git clone's the aws-sdk-go source repo into the cache and
