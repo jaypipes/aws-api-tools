@@ -88,8 +88,7 @@ func (a *API) GetPayloads() []*Shape {
 	return res
 }
 
-// GetObjects returns all Shapes that are structures returned from top-level
-// operations. Objects are the shapes that are *not* payloads, scalars or
+// GetObjects returns shapes that are *not* payloads, scalars, lists or
 // exceptions
 func (a *API) GetObjects() []*Shape {
 	res := make([]*Shape, len(a.objectMap))
@@ -107,6 +106,17 @@ func (a *API) GetExceptions() []*Shape {
 	x := 0
 	for _, exception := range a.exceptionMap {
 		res[x] = exception
+		x++
+	}
+	return res
+}
+
+// GetLists returns all Shapes that are list classes
+func (a *API) GetLists() []*Shape {
+	res := make([]*Shape, len(a.listMap))
+	x := 0
+	for _, list := range a.listMap {
+		res[x] = list
 		x++
 	}
 	return res

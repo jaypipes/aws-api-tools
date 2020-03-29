@@ -72,6 +72,13 @@ var apiExceptionsCmd = &cobra.Command{
 	RunE:  apiExceptions,
 }
 
+// apiExceptionsCmd lists all scalar types for an AWS API service
+var apiListsCmd = &cobra.Command{
+	Use:   "lists",
+	Short: "lists List types for an AWS API service",
+	RunE:  apiLists,
+}
+
 func init() {
 	apiCmd.PersistentFlags().StringVarP(
 		&cliService, "service", "s", "", "Alias of the AWS service to work with.",
@@ -89,6 +96,7 @@ func init() {
 	apiCmd.AddCommand(apiScalarsCmd)
 	apiCmd.AddCommand(apiPayloadsCmd)
 	apiCmd.AddCommand(apiExceptionsCmd)
+	apiCmd.AddCommand(apiListsCmd)
 	rootCmd.AddCommand(apiCmd)
 }
 
@@ -247,6 +255,30 @@ func printAPIExceptions(svc *Service) {
 	rows := make([][]string, len(exceptions))
 	for x, exception := range exceptions {
 		rows[x] = []string{exception.Name}
+	}
+	sort.Slice(rows, func(i, j int) bool {
+		return rows[i][0] < rows[j][0]
+	})
+	table := tablewriter.NewWriter(os.Stdout)
+	table.SetHeader(headers)
+	table.AppendBulk(rows)
+	table.Render()
+}
+
+func apiLists(cmd *cobra.Command, args []string) error {
+	if err := ensureService(); err != nil {
+		return err
+	}
+	printAPILists(serviceRef)
+	return nil
+}
+
+func printAPILists(svc *Service) {
+	lists := svc.API.GetLists()
+	headers := []string{"Name"}
+	rows := make([][]string, len(lists))
+	for x, list := range lists {
+		rows[x] = []string{list.Name}
 	}
 	sort.Slice(rows, func(i, j int) bool {
 		return rows[i][0] < rows[j][0]
