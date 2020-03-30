@@ -25,42 +25,28 @@ const (
 )
 
 var (
-	filteredServices = []string{}
-	cliServices      = ""
+	cliListFilter = ""
 )
 
 // servicesCmd provides sub-commands for querying/listing AWS services
 var serviceCmd = &cobra.Command{
 	Use:   "service",
 	Short: "query names and other information about AWS service APIs",
-	Args:  processServiceCmdArgs,
 }
 
 // servicesListCmd lists AWS service APIs
 var serviceListCmd = &cobra.Command{
 	Use:   "list",
 	Short: "lists AWS service API information",
-	Args:  processServiceCmdArgs,
 	RunE:  serviceList,
 }
 
 func init() {
-	serviceCmd.PersistentFlags().StringVar(
-		&cliServices, "services", "", "Comma-delimited list of AWS service aliases to operate on (e.g. --services s3,iam) Default is to operate on all services.",
+	serviceCmd.PersistentFlags().StringVarP(
+		&cliListFilter, "filter", "f", "", "Comma-delimited list of strings to filter services on. Strings may be regular expressions.",
 	)
 	serviceCmd.AddCommand(serviceListCmd)
 	rootCmd.AddCommand(serviceCmd)
-}
-
-func processServiceCmdArgs(cmd *cobra.Command, args []string) error {
-	processFilteredServices()
-	return nil
-}
-
-func processFilteredServices() {
-	if cliServices != "" {
-		filteredServices = strings.Split(cliServices, ",")
-	}
 }
 
 func ensureSDKRepo() (string, error) {
@@ -78,13 +64,28 @@ func ensureSDKRepo() (string, error) {
 	return clonePath, nil
 }
 
+type Service struct {
+	Alias string
+	API   *apimodel.API
+}
+
+type ServiceFilter struct {
+	anyMatch []string
+}
+
 func serviceList(cmd *cobra.Command, args []string) error {
 	sdkPath, err := ensureSDKRepo()
 	if err != nil {
 		return err
 	}
 	trace("fetching service information from aws-sdk-go ... \n")
-	svcs, err := getServices(sdkPath, filteredServices)
+	var filter *ServiceFilter
+	if cliListFilter != "" {
+		filter = &ServiceFilter{
+			anyMatch: strings.Split(cliListFilter, ","),
+		}
+	}
+	svcs, err := getServices(sdkPath, filter)
 	if err != nil {
 		return err
 	}
@@ -97,6 +98,7 @@ func serviceList(cmd *cobra.Command, args []string) error {
 			svc.API.Metadata.ServiceFullName,
 		}
 	}
+	noResults(rows)
 	table := tablewriter.NewWriter(os.Stdout)
 	table.SetHeader(headers)
 	table.AppendBulk(rows)
@@ -104,16 +106,11 @@ func serviceList(cmd *cobra.Command, args []string) error {
 	return nil
 }
 
-type Service struct {
-	Alias string
-	API   *apimodel.API
-}
-
 // getServices returns a slice of Service objects representing the AWS service
 // APIs listed in the models/apis/ directory of the aws-sdk-go repository
 func getServices(
 	clonePath string,
-	filtered []string,
+	filter *ServiceFilter,
 ) ([]Service, error) {
 	svcs := []Service{}
 
@@ -133,8 +130,10 @@ func getServices(
 			continue
 		}
 		// Filter just the services we're interested in
-		if !inStrings(fname, filtered) {
-			continue
+		if filter != nil {
+			if !inStrings(fname, filter.anyMatch) {
+				continue
+			}
 		}
 		version, err := getServiceAPIVersion(fp)
 		if err != nil {
@@ -155,7 +154,7 @@ func getService(
 	clonePath string,
 	serviceAlias string,
 ) (Service, error) {
-	svcs, err := getServices(clonePath, []string{serviceAlias})
+	svcs, err := getServices(clonePath, &ServiceFilter{anyMatch: []string{serviceAlias}})
 	if err != nil {
 		return Service{}, err
 	}

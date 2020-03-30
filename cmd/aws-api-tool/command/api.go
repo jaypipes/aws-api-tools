@@ -132,19 +132,21 @@ func apiInfo(cmd *cobra.Command, args []string) error {
 
 func printAPIInfo(svc *Service) {
 	ops := svc.API.GetOperations(nil)
+	primaries := svc.API.GetPrimaries()
 	objects := svc.API.GetObjects()
 	scalars := svc.API.GetScalars()
 	payloads := svc.API.GetPayloads()
 	exceptions := svc.API.GetExceptions()
 	lists := svc.API.GetLists()
-	fmt.Printf("Service '%s'\n", svc.Alias)
-	fmt.Printf("  API Version:         %s\n", svc.API.Metadata.APIVersion)
-	fmt.Printf("  Total operations:    %d\n", len(ops))
-	fmt.Printf("  Total scalars:       %d\n", len(scalars))
-	fmt.Printf("  Total objects:       %d\n", len(objects))
-	fmt.Printf("  Total payloads:      %d\n", len(payloads))
-	fmt.Printf("  Total exceptions:    %d\n", len(exceptions))
-	fmt.Printf("  Total lists:         %d\n", len(lists))
+	fmt.Printf("Full name:        %s\n", svc.API.Metadata.ServiceFullName)
+	fmt.Printf("API version:      %s\n", svc.API.Metadata.APIVersion)
+	fmt.Printf("Total operations: %d\n", len(ops))
+	fmt.Printf("Total primaries:  %d\n", len(primaries))
+	fmt.Printf("Total objects:    %d\n", len(objects))
+	fmt.Printf("Total scalars:    %d\n", len(scalars))
+	fmt.Printf("Total payloads:   %d\n", len(payloads))
+	fmt.Printf("Total exceptions: %d\n", len(exceptions))
+	fmt.Printf("Total lists:      %d\n", len(lists))
 }
 
 func apiOperations(cmd *cobra.Command, args []string) error {
