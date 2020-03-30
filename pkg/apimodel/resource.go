@@ -13,10 +13,10 @@ import (
 	pluralize "github.com/gertd/go-pluralize"
 )
 
-// If a service API has a protocol of "query", the API generally follows a
-// pattern that we can use to determine top-level or primary objects:
+// If a service API has a protocol of "query" or "rest-json", the API generally
+// follows a pattern that we can use to determine top-level or resource objects:
 //
-// There will be a Create operation that involves the primary object called
+// There will be a Create operation that involves the resource object called
 // Create{$ObjectName}. An example of this from the SNS API:
 //
 //  "CreateTopic":{
@@ -43,7 +43,7 @@ import (
 //    ]
 //  },
 //
-// We will be able to identify the fields in the primary object by looking at
+// We will be able to identify the fields in the resource object by looking at
 // the input Shape and grabbing the shape that is listed in its single member.
 // For example, the CreateTopicInput shape from the SNS API:
 //
@@ -68,18 +68,40 @@ import (
 //    }
 //  },
 
-func getQueryProtocolPrimaries(api *API) (map[string]*Primary, error) {
+func getResources(api *API) (map[string]*Resource, error) {
 	pluralize := pluralize.NewClient()
-	primaries := map[string]*Primary{}
+	resources := map[string]*Resource{}
 	filter := &OperationFilter{
 		Prefixes: []string{"Create"},
 	}
 	createOps := api.GetOperations(filter)
 	for _, createOp := range createOps {
-		objName := strings.TrimPrefix(createOp.Name, "Create")
-		primary := &Primary{
-			SingularName: objName,
-			PluralName:   pluralize.Plural(objName),
+		// Some API operations are "CreateOrUpdate" -- i.e. "Replace". For
+		// instance, the AWS Autoscaling API has a CreateOrUpdateTags
+		// operation. Trim off the "CreateOrUpdate" prefix for these
+		// operations.
+		var objName string
+		if strings.HasPrefix(createOp.Name, "CreateOrUpdate") {
+			objName = strings.TrimPrefix(createOp.Name, "CreateOrUpdate")
+		} else {
+			objName = strings.TrimPrefix(createOp.Name, "Create")
+		}
+		singularName := pluralize.Singular(objName)
+
+		// Tag is a special case. It is often represented as a
+		// top-level/resource object because there are CreateOrUpdateTags
+		// operations that accept a payload that replaces all tags on a
+		// specific resource. However, Tag is not an actual resource object.
+		// Instead, nearly all resources can have zero or more key/value pairs
+		// associated with them (these are tags).
+		if singularName == "Tag" {
+			continue
+		}
+
+		pluralName := pluralize.Plural(objName)
+		resource := &Resource{
+			SingularName: singularName,
+			PluralName:   pluralName,
 			Fields:       map[string]*Field{},
 		}
 		// Find the shape representing the input to the create operation and
@@ -94,7 +116,7 @@ func getQueryProtocolPrimaries(api *API) (map[string]*Primary, error) {
 				return nil, fmt.Errorf("expected to find a structure type for input shape %s but found %s", inShapeName, inShape.Type)
 			}
 			for fieldName, field := range inShape.Fields {
-				primary.Fields[fieldName] = &Field{
+				resource.Fields[fieldName] = &Field{
 					Type:       field.Type,
 					IsRequired: inStrings(fieldName, field.RequiredFieldNames),
 					IsMutable:  true,
@@ -102,7 +124,7 @@ func getQueryProtocolPrimaries(api *API) (map[string]*Primary, error) {
 			}
 		}
 		// Find the shape representing the ouput of the create operation and
-		// add fields from the output shape to the primary object, excluding
+		// add fields from the output shape to the resource object, excluding
 		// fields already added from the input
 		if createOp.Output != nil {
 			outShapeName := createOp.Output.Name
@@ -114,8 +136,8 @@ func getQueryProtocolPrimaries(api *API) (map[string]*Primary, error) {
 				return nil, fmt.Errorf("expected to find a structure type for input shape %s but found %s", outShapeName, outShape.Type)
 			}
 			for fieldName, field := range outShape.Fields {
-				if _, found := primary.Fields[fieldName]; !found {
-					primary.Fields[fieldName] = &Field{
+				if _, found := resource.Fields[fieldName]; !found {
+					resource.Fields[fieldName] = &Field{
 						Type:       field.Type,
 						IsRequired: inStrings(field.Name, field.RequiredFieldNames),
 						IsMutable:  false,
@@ -123,7 +145,7 @@ func getQueryProtocolPrimaries(api *API) (map[string]*Primary, error) {
 				}
 			}
 		}
-		primaries[objName] = primary
+		resources[objName] = resource
 	}
-	return primaries, nil
+	return resources, nil
 }

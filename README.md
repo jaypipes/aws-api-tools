@@ -63,7 +63,7 @@ $ aws-api-tool api --service sns info
 Full name:        Amazon Simple Notification Service
 API version:      2010-03-31
 Total operations: 33
-Total primaries:  3
+Total resources:  3
 Total objects:    6
 Total scalars:    30
 Total payloads:   56
@@ -117,16 +117,16 @@ $ aws-api-tool api --service sns operations
 +------------------------------------+-------------+
 ```
 
-#### List API primary objects
+#### List API resource objects
 
-Primary objects are those objects that are "top-level" constructs in an API.
-These primary objects correspond to the core structures exposed in the API with
+Resource objects are those objects that are "top-level" constructs in an API.
+These resource objects correspond to the core structures exposed in the API with
 Create, Read, Update and Delete operations.
 
-Use the `aws-api-tool api primaries` command to list these primary objects:
+Use the `aws-api-tool api resources` command to list these resource objects:
 
 ```
-$ aws-api-tool api --service sqs primaries
+$ aws-api-tool api --service sqs resources
 +-------+
 | NAME  |
 +-------+

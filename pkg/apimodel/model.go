@@ -31,7 +31,7 @@ type Field struct {
 	IsMutable  bool
 }
 
-type Primary struct {
+type Resource struct {
 	SingularName string
 	PluralName   string
 	Fields       map[string]*Field
@@ -46,7 +46,7 @@ type API struct {
 	exceptionMap map[string]*Shape
 	objectMap    map[string]*Shape
 	listMap      map[string]*Shape
-	primaryMap   map[string]*Primary
+	resourceMap  map[string]*Resource
 }
 
 type OperationFilter struct {
@@ -103,13 +103,13 @@ func (a *API) GetPayloads() []*Shape {
 	return res
 }
 
-// GetPrimaries returns objects that have been identified as top-level primary
+// GetResources returns objects that have been identified as top-level resource
 // structures for the API.
-func (a *API) GetPrimaries() []*Primary {
-	res := make([]*Primary, len(a.primaryMap))
+func (a *API) GetResources() []*Resource {
+	res := make([]*Resource, len(a.resourceMap))
 	x := 0
-	for _, primary := range a.primaryMap {
-		res[x] = primary
+	for _, resource := range a.resourceMap {
+		res[x] = resource
 		x++
 	}
 	return res

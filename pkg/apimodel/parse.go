@@ -64,12 +64,12 @@ func ParseFrom(modelPath string) (*API, error) {
 		return nil, err
 	}
 
-	if api.Metadata.Protocol == "query" {
-		primaries, err := getQueryProtocolPrimaries(api)
+	if api.Metadata.Protocol == "query" || api.Metadata.Protocol == "rest-json" {
+		resources, err := getResources(api)
 		if err != nil {
 			return nil, err
 		}
-		api.primaryMap = primaries
+		api.resourceMap = resources
 	}
 	return api, nil
 }
@@ -84,7 +84,7 @@ func apiFromSpec(spec *apiSpec) (*API, error) {
 		exceptionMap: map[string]*Shape{},
 		objectMap:    map[string]*Shape{},
 		listMap:      map[string]*Shape{},
-		primaryMap:   map[string]*Primary{},
+		resourceMap:  map[string]*Resource{},
 	}
 	// Populate the base shape and operation maps
 	for shapeName, shapeSpec := range spec.Shapes {

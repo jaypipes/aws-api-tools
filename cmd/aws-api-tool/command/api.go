@@ -44,11 +44,11 @@ var apiOperationsCmd = &cobra.Command{
 	RunE:  apiOperations,
 }
 
-// apiPrimariesCmd lists all primary object types for an AWS API service
-var apiPrimariesCmd = &cobra.Command{
-	Use:   "primaries",
-	Short: "lists Primary object types for an AWS API service",
-	RunE:  apiPrimaries,
+// apiResourcesCmd lists all resource object types for an AWS API service
+var apiResourcesCmd = &cobra.Command{
+	Use:   "resources",
+	Short: "lists Resource object types for an AWS API service",
+	RunE:  apiResources,
 }
 
 // apiObjectsCmd lists all object types for an AWS API service
@@ -99,7 +99,7 @@ func init() {
 	apiCmd.MarkFlagRequired("service")
 	apiCmd.AddCommand(apiInfoCmd)
 	apiCmd.AddCommand(apiOperationsCmd)
-	apiCmd.AddCommand(apiPrimariesCmd)
+	apiCmd.AddCommand(apiResourcesCmd)
 	apiCmd.AddCommand(apiObjectsCmd)
 	apiCmd.AddCommand(apiScalarsCmd)
 	apiCmd.AddCommand(apiPayloadsCmd)
@@ -132,7 +132,7 @@ func apiInfo(cmd *cobra.Command, args []string) error {
 
 func printAPIInfo(svc *Service) {
 	ops := svc.API.GetOperations(nil)
-	primaries := svc.API.GetPrimaries()
+	resources := svc.API.GetResources()
 	objects := svc.API.GetObjects()
 	scalars := svc.API.GetScalars()
 	payloads := svc.API.GetPayloads()
@@ -141,7 +141,7 @@ func printAPIInfo(svc *Service) {
 	fmt.Printf("Full name:        %s\n", svc.API.Metadata.ServiceFullName)
 	fmt.Printf("API version:      %s\n", svc.API.Metadata.APIVersion)
 	fmt.Printf("Total operations: %d\n", len(ops))
-	fmt.Printf("Total primaries:  %d\n", len(primaries))
+	fmt.Printf("Total resources:  %d\n", len(resources))
 	fmt.Printf("Total objects:    %d\n", len(objects))
 	fmt.Printf("Total scalars:    %d\n", len(scalars))
 	fmt.Printf("Total payloads:   %d\n", len(payloads))
@@ -182,20 +182,20 @@ func printAPIOperations(svc *Service) {
 	table.Render()
 }
 
-func apiPrimaries(cmd *cobra.Command, args []string) error {
+func apiResources(cmd *cobra.Command, args []string) error {
 	if err := ensureService(); err != nil {
 		return err
 	}
-	printAPIPrimaries(serviceRef)
+	printAPIResources(serviceRef)
 	return nil
 }
 
-func printAPIPrimaries(svc *Service) {
-	primaries := svc.API.GetPrimaries()
+func printAPIResources(svc *Service) {
+	resources := svc.API.GetResources()
 	headers := []string{"Name"}
-	rows := make([][]string, len(primaries))
-	for x, primary := range primaries {
-		rows[x] = []string{primary.SingularName}
+	rows := make([][]string, len(resources))
+	for x, resource := range resources {
+		rows[x] = []string{resource.SingularName}
 	}
 	noResults(rows)
 	sort.Slice(rows, func(i, j int) bool {
