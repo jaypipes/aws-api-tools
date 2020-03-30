@@ -44,7 +44,14 @@ var apiOperationsCmd = &cobra.Command{
 	RunE:  apiOperations,
 }
 
-// apiObjectsCmd lists all scalar types for an AWS API service
+// apiPrimariesCmd lists all primary object types for an AWS API service
+var apiPrimariesCmd = &cobra.Command{
+	Use:   "primaries",
+	Short: "lists Primary object types for an AWS API service",
+	RunE:  apiPrimaries,
+}
+
+// apiObjectsCmd lists all object types for an AWS API service
 var apiObjectsCmd = &cobra.Command{
 	Use:   "objects",
 	Short: "lists Object types for an AWS API service",
@@ -58,21 +65,21 @@ var apiScalarsCmd = &cobra.Command{
 	RunE:  apiScalars,
 }
 
-// apiPayloadsCmd lists all scalar types for an AWS API service
+// apiPayloadsCmd lists all payload types for an AWS API service
 var apiPayloadsCmd = &cobra.Command{
 	Use:   "payloads",
 	Short: "lists Payload types for an AWS API service",
 	RunE:  apiPayloads,
 }
 
-// apiExceptionsCmd lists all scalar types for an AWS API service
+// apiExceptionsCmd lists all exception types for an AWS API service
 var apiExceptionsCmd = &cobra.Command{
 	Use:   "exceptions",
 	Short: "lists Exception types for an AWS API service",
 	RunE:  apiExceptions,
 }
 
-// apiExceptionsCmd lists all scalar types for an AWS API service
+// apiListsCmd lists all list types for an AWS API service
 var apiListsCmd = &cobra.Command{
 	Use:   "lists",
 	Short: "lists List types for an AWS API service",
@@ -92,6 +99,7 @@ func init() {
 	apiCmd.MarkFlagRequired("service")
 	apiCmd.AddCommand(apiInfoCmd)
 	apiCmd.AddCommand(apiOperationsCmd)
+	apiCmd.AddCommand(apiPrimariesCmd)
 	apiCmd.AddCommand(apiObjectsCmd)
 	apiCmd.AddCommand(apiScalarsCmd)
 	apiCmd.AddCommand(apiPayloadsCmd)
@@ -161,6 +169,31 @@ func printAPIOperations(svc *Service) {
 	rows := make([][]string, len(operations))
 	for x, operation := range operations {
 		rows[x] = []string{operation.Name, operation.Method}
+	}
+	noResults(rows)
+	sort.Slice(rows, func(i, j int) bool {
+		return rows[i][0] < rows[j][0]
+	})
+	table := tablewriter.NewWriter(os.Stdout)
+	table.SetHeader(headers)
+	table.AppendBulk(rows)
+	table.Render()
+}
+
+func apiPrimaries(cmd *cobra.Command, args []string) error {
+	if err := ensureService(); err != nil {
+		return err
+	}
+	printAPIPrimaries(serviceRef)
+	return nil
+}
+
+func printAPIPrimaries(svc *Service) {
+	primaries := svc.API.GetPrimaries()
+	headers := []string{"Name"}
+	rows := make([][]string, len(primaries))
+	for x, primary := range primaries {
+		rows[x] = []string{primary.SingularName}
 	}
 	noResults(rows)
 	sort.Slice(rows, func(i, j int) bool {

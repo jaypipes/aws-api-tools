@@ -11,8 +11,10 @@ import (
 )
 
 type Shape struct {
-	Name string
-	Type string
+	Name               string
+	Type               string
+	Fields             map[string]*Shape
+	RequiredFieldNames []string
 }
 
 type Operation struct {
@@ -21,6 +23,18 @@ type Operation struct {
 	Input  *Shape
 	Output *Shape
 	Errors []*Shape
+}
+
+type Field struct {
+	Type       string
+	IsRequired bool
+	IsMutable  bool
+}
+
+type Primary struct {
+	SingularName string
+	PluralName   string
+	Fields       map[string]*Field
 }
 
 type API struct {
@@ -32,6 +46,7 @@ type API struct {
 	exceptionMap map[string]*Shape
 	objectMap    map[string]*Shape
 	listMap      map[string]*Shape
+	primaryMap   map[string]*Primary
 }
 
 type OperationFilter struct {
@@ -83,6 +98,18 @@ func (a *API) GetPayloads() []*Shape {
 	x := 0
 	for _, payload := range a.payloadMap {
 		res[x] = payload
+		x++
+	}
+	return res
+}
+
+// GetPrimaries returns objects that have been identified as top-level primary
+// structures for the API.
+func (a *API) GetPrimaries() []*Primary {
+	res := make([]*Primary, len(a.primaryMap))
+	x := 0
+	for _, primary := range a.primaryMap {
+		res[x] = primary
 		x++
 	}
 	return res

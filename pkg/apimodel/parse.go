@@ -16,6 +16,7 @@ import (
 type metadataSpec struct {
 	APIVersion      string `json:"apiVersion"`
 	ServiceFullName string `json:"serviceFullName"`
+	Protocol        string `json:"protocol"`
 }
 
 type shapeRefSpec struct {
@@ -38,6 +39,7 @@ type opSpec struct {
 type shapeSpec struct {
 	Type      string                  `json:"type"`
 	Exception bool                    `json:"exception"`
+	Required  []string                `json:"required"`
 	Members   map[string]shapeRefSpec `json:"members"`
 }
 
@@ -61,6 +63,14 @@ func ParseFrom(modelPath string) (*API, error) {
 	if err != nil {
 		return nil, err
 	}
+
+	if api.Metadata.Protocol == "query" {
+		primaries, err := getQueryProtocolPrimaries(api)
+		if err != nil {
+			return nil, err
+		}
+		api.primaryMap = primaries
+	}
 	return api, nil
 }
 
@@ -74,12 +84,15 @@ func apiFromSpec(spec *apiSpec) (*API, error) {
 		exceptionMap: map[string]*Shape{},
 		objectMap:    map[string]*Shape{},
 		listMap:      map[string]*Shape{},
+		primaryMap:   map[string]*Primary{},
 	}
 	// Populate the base shape and operation maps
 	for shapeName, shapeSpec := range spec.Shapes {
 		shape := Shape{
-			Name: shapeName,
-			Type: shapeSpec.Type,
+			Name:               shapeName,
+			Type:               shapeSpec.Type,
+			Fields:             make(map[string]*Shape, len(shapeSpec.Members)),
+			RequiredFieldNames: shapeSpec.Required,
 		}
 		api.shapeMap[shapeName] = shape
 
@@ -92,32 +105,66 @@ func apiFromSpec(spec *apiSpec) (*API, error) {
 			api.listMap[shapeName] = &shape
 		}
 	}
+
+	// Set each shape's field references
+	for shapeName, shapeSpec := range spec.Shapes {
+		if len(shapeSpec.Members) == 0 {
+			continue
+		}
+		shape, found := api.shapeMap[shapeName]
+		if !found {
+			return nil, fmt.Errorf("expected to find shape %s in shapeMap", shapeName)
+		}
+		x := 0
+		for memberName, memberShapeRef := range shapeSpec.Members {
+			if memberShapeRef.ShapeName == nil {
+				continue
+			}
+			memberShapeName := *memberShapeRef.ShapeName
+			memberShape, found := api.shapeMap[memberShapeName]
+			if !found {
+				return nil, fmt.Errorf("expected to find member shape %s in shapeMap", memberShapeName)
+			}
+			shape.Fields[memberName] = &memberShape
+			x++
+		}
+	}
 	for opName, opSpec := range spec.Operations {
-		api.opMap[opName] = Operation{
+		op := Operation{
 			Name:   opName,
 			Method: opSpec.HTTP.Method,
 		}
-		// Determine payload types by examining the Input and Output pointers
-		// for Operations
-		for _, opSpec := range spec.Operations {
-			if opSpec.Input.ShapeName != nil {
-				inShapeName := *opSpec.Input.ShapeName
-				sh, ok := api.shapeMap[inShapeName]
-				if !ok {
-					return nil, fmt.Errorf("expected to find shape %s", inShapeName)
-				}
-				api.payloadMap[inShapeName] = &sh
-
+		if opSpec.Input.ShapeName != nil {
+			inShapeName := *opSpec.Input.ShapeName
+			inShape, ok := api.shapeMap[inShapeName]
+			if !ok {
+				return nil, fmt.Errorf("expected to find shape %s", inShapeName)
 			}
-			if opSpec.Output.ShapeName != nil {
-				outShapeName := *opSpec.Output.ShapeName
-				sh, ok := api.shapeMap[outShapeName]
-				if !ok {
-					return nil, fmt.Errorf("expected to find shape %s", outShapeName)
-				}
-				api.payloadMap[outShapeName] = &sh
-			}
+			api.payloadMap[inShapeName] = &inShape
+			op.Input = &inShape
 		}
+		if opSpec.Output.ShapeName != nil {
+			outShapeName := *opSpec.Output.ShapeName
+			outShape, ok := api.shapeMap[outShapeName]
+			if !ok {
+				return nil, fmt.Errorf("expected to find shape %s", outShapeName)
+			}
+			api.payloadMap[outShapeName] = &outShape
+			op.Output = &outShape
+		}
+		if len(opSpec.Errors) > 0 {
+			errs := make([]*Shape, len(opSpec.Errors))
+			for x, errShapeRef := range opSpec.Errors {
+				errShapeName := *errShapeRef.ShapeName
+				errShape, ok := api.shapeMap[errShapeName]
+				if !ok {
+					return nil, fmt.Errorf("expected to find shape %s", errShapeName)
+				}
+				errs[x] = &errShape
+			}
+			op.Errors = errs
+		}
+		api.opMap[opName] = op
 	}
 
 	// objects are the shapes that are *not* payloads, scalars or exceptions
