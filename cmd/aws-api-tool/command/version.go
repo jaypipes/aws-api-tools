@@ -4,7 +4,7 @@
 // See the COPYING file in the root project directory for full text.
 //
 
-package commands
+package command
 
 import (
 	"fmt"

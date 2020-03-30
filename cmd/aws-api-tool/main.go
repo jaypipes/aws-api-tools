@@ -7,7 +7,7 @@
 package main
 
 import (
-	"github.com/jaypipes/aws-api-tools/cmd/aws-api-tool/commands"
+	"github.com/jaypipes/aws-api-tools/cmd/aws-api-tool/command"
 )
 
 var (
@@ -20,5 +20,5 @@ var (
 )
 
 func main() {
-	commands.Execute(version, buildHash, buildDate)
+	command.Execute(version, buildHash, buildDate)
 }
