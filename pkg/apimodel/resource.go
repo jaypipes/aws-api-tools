@@ -13,8 +13,8 @@ import (
 	pluralize "github.com/gertd/go-pluralize"
 )
 
-// If a service API has a protocol of "query" or "rest-json", the API generally
-// follows a pattern that we can use to determine top-level or resource objects:
+// Many service APIs follow a pattern that we can use to determine top-level or
+// resource objects:
 //
 // There will be a Create operation that involves the resource object called
 // Create{$ObjectName}. An example of this from the SNS API:
@@ -70,6 +70,7 @@ import (
 
 func getResources(api *API) (map[string]*Resource, error) {
 	pluralize := pluralize.NewClient()
+	apiProtocol := api.Metadata.Protocol
 	resources := map[string]*Resource{}
 	filter := &OperationFilter{
 		Prefixes: []string{"Create"},
@@ -96,6 +97,15 @@ func getResources(api *API) (map[string]*Resource, error) {
 		// associated with them (these are tags).
 		if singularName == "Tag" {
 			continue
+		}
+
+		// For APIs that have a "rest-json" protocol, we can look at the operation's
+		// http.requestUri field to determine whether the operation is on a "top-level"
+		// object.
+		if apiProtocol == "rest-json" {
+			if strings.Count(createOp.RequestURI, "/") > 1 {
+				continue
+			}
 		}
 
 		pluralName := pluralize.Plural(objName)

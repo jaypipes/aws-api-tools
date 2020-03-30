@@ -63,14 +63,6 @@ func ParseFrom(modelPath string) (*API, error) {
 	if err != nil {
 		return nil, err
 	}
-
-	if api.Metadata.Protocol == "query" || api.Metadata.Protocol == "rest-json" {
-		resources, err := getResources(api)
-		if err != nil {
-			return nil, err
-		}
-		api.resourceMap = resources
-	}
 	return api, nil
 }
 
@@ -131,8 +123,9 @@ func apiFromSpec(spec *apiSpec) (*API, error) {
 	}
 	for opName, opSpec := range spec.Operations {
 		op := Operation{
-			Name:   opName,
-			Method: opSpec.HTTP.Method,
+			Name:       opName,
+			Method:     opSpec.HTTP.Method,
+			RequestURI: opSpec.HTTP.RequestURI,
 		}
 		if opSpec.Input.ShapeName != nil {
 			inShapeName := *opSpec.Input.ShapeName
@@ -184,5 +177,11 @@ func apiFromSpec(spec *apiSpec) (*API, error) {
 		objShape := api.shapeMap[shapeName]
 		api.objectMap[shapeName] = &objShape
 	}
+
+	resources, err := getResources(&api)
+	if err != nil {
+		return nil, err
+	}
+	api.resourceMap = resources
 	return &api, nil
 }

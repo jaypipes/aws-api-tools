@@ -18,11 +18,12 @@ type Shape struct {
 }
 
 type Operation struct {
-	Name   string
-	Method string
-	Input  *Shape
-	Output *Shape
-	Errors []*Shape
+	Name       string
+	Method     string
+	RequestURI string
+	Input      *Shape
+	Output     *Shape
+	Errors     []*Shape
 }
 
 type Field struct {

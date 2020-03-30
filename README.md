@@ -117,6 +117,74 @@ $ aws-api-tool api --service sns operations
 +------------------------------------+-------------+
 ```
 
+You can filter the results using the `--method` and `--prefix` flags which both
+take a comma-delimited string of HTTP methods or string name prefixes to filter
+results by:
+
+```
+$ aws-api-tool api --service ec2 operations --prefix Update,Delete
++--------------------------------------------+-------------+
+|                    NAME                    | HTTP METHOD |
++--------------------------------------------+-------------+
+| DeleteClientVpnEndpoint                    | POST        |
+| DeleteClientVpnRoute                       | POST        |
+| DeleteCustomerGateway                      | POST        |
+| DeleteDhcpOptions                          | POST        |
+| DeleteEgressOnlyInternetGateway            | POST        |
+| DeleteFleets                               | POST        |
+| DeleteFlowLogs                             | POST        |
+| DeleteFpgaImage                            | POST        |
+| DeleteInternetGateway                      | POST        |
+| DeleteKeyPair                              | POST        |
+| DeleteLaunchTemplate                       | POST        |
+| DeleteLaunchTemplateVersions               | POST        |
+| DeleteLocalGatewayRoute                    | POST        |
+| DeleteLocalGatewayRouteTableVpcAssociation | POST        |
+| DeleteNatGateway                           | POST        |
+| DeleteNetworkAcl                           | POST        |
+| DeleteNetworkAclEntry                      | POST        |
+| DeleteNetworkInterface                     | POST        |
+| DeleteNetworkInterfacePermission           | POST        |
+| DeletePlacementGroup                       | POST        |
+| DeleteQueuedReservedInstances              | POST        |
+| DeleteRoute                                | POST        |
+| DeleteRouteTable                           | POST        |
+| DeleteSecurityGroup                        | POST        |
+| DeleteSnapshot                             | POST        |
+| DeleteSpotDatafeedSubscription             | POST        |
+| DeleteSubnet                               | POST        |
+| DeleteTags                                 | POST        |
+| DeleteTrafficMirrorFilter                  | POST        |
+| DeleteTrafficMirrorFilterRule              | POST        |
+| DeleteTrafficMirrorSession                 | POST        |
+| DeleteTrafficMirrorTarget                  | POST        |
+| DeleteTransitGateway                       | POST        |
+| DeleteTransitGatewayMulticastDomain        | POST        |
+| DeleteTransitGatewayPeeringAttachment      | POST        |
+| DeleteTransitGatewayRoute                  | POST        |
+| DeleteTransitGatewayRouteTable             | POST        |
+| DeleteTransitGatewayVpcAttachment          | POST        |
+| DeleteVolume                               | POST        |
+| DeleteVpc                                  | POST        |
+| DeleteVpcEndpointConnectionNotifications   | POST        |
+| DeleteVpcEndpointServiceConfigurations     | POST        |
+| DeleteVpcEndpoints                         | POST        |
+| DeleteVpcPeeringConnection                 | POST        |
+| DeleteVpnConnection                        | POST        |
+| DeleteVpnConnectionRoute                   | POST        |
+| DeleteVpnGateway                           | POST        |
+| UpdateSecurityGroupRuleDescriptionsEgress  | POST        |
+| UpdateSecurityGroupRuleDescriptionsIngress | POST        |
++--------------------------------------------+-------------+
+$ aws-api-tool api --service s3 operations --method GET --prefix ListO
++--------------------+-------------+
+|        NAME        | HTTP METHOD |
++--------------------+-------------+
+| ListObjectVersions | GET         |
+| ListObjects        | GET         |
+| ListObjectsV2      | GET         |
++--------------------+-------------+
+```
 #### List API resource objects
 
 Resource objects are those objects that are "top-level" constructs in an API.
@@ -133,6 +201,53 @@ $ aws-api-tool api --service sqs resources
 | Queue |
 +-------+
 ```
+
+Resource objects are only top-level objects in the API. If an object is solely
+contained within another object, it is not a resource object. For example, the
+AWS APIGateway API has the following Create operations:
+
+```
+$ aws-api-tool api --service apigateway operations --prefix Create
++----------------------------+-------------+
+|            NAME            | HTTP METHOD |
++----------------------------+-------------+
+| CreateApiKey               | POST        |
+| CreateAuthorizer           | POST        |
+| CreateBasePathMapping      | POST        |
+| CreateDeployment           | POST        |
+| CreateDocumentationPart    | POST        |
+| CreateDocumentationVersion | POST        |
+| CreateDomainName           | POST        |
+| CreateModel                | POST        |
+| CreateRequestValidator     | POST        |
+| CreateResource             | POST        |
+| CreateRestApi              | POST        |
+| CreateStage                | POST        |
+| CreateUsagePlan            | POST        |
+| CreateUsagePlanKey         | POST        |
+| CreateVpcLink              | POST        |
++----------------------------+-------------+
+```
+
+However, of the above, only the `ApiKey`, `DomainName`, `RestApi`, `UsagePlan` and
+`VpcLink` are resources:
+
+```
+$ aws-api-tool api --service apigateway resources
++------------+
+|    NAME    |
++------------+
+| ApiKey     |
+| DomainName |
+| RestApi    |
+| UsagePlan  |
+| VpcLink    |
++------------+
+```
+
+This is because the other objects are solely contained within
+another object. For example, a `Deployment` is solely a part of a `RestApi`
+object; it cannot be created as a separate thing.
 
 #### List API objects
 
