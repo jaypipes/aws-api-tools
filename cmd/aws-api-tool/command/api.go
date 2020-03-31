@@ -8,359 +8,151 @@ package command
 
 import (
 	"fmt"
+	"io/ioutil"
 	"os"
-	"sort"
-	"strings"
+	"os/exec"
+	"path/filepath"
 
 	"github.com/jaypipes/aws-api-tools/pkg/apimodel"
-	"github.com/olekukonko/tablewriter"
-	"github.com/spf13/cobra"
 )
 
-var (
-	cliService               string
-	cliHTTPMethodFilter      string
-	cliOperationPrefixFilter string
-	serviceRef               *Service
+const (
+	sdkRepoURL = "https://github.com/aws/aws-sdk-go"
 )
 
-// apiCmd provides sub-commands for exploring the AWS API models
-var apiCmd = &cobra.Command{
-	Use:   "api",
-	Short: "query API model information for an AWS service API",
+func ensureSDKRepo() (string, error) {
+	srcPath := filepath.Join(cachePath, "src")
+	if err := os.MkdirAll(srcPath, os.ModePerm); err != nil {
+		return "", err
+	}
+	// clone the aws-sdk-go repository locally so we can query for API
+	// information in the models/apis/ directories
+	trace("cloning aws-sdk-go to local cache %s ...\n", srcPath)
+	clonePath, err := cloneSDKRepo(srcPath)
+	if err != nil {
+		return "", err
+	}
+	return clonePath, nil
 }
 
-// apiInfoCmd shows summary information for one or more AWS API service models
-var apiInfoCmd = &cobra.Command{
-	Use:   "info",
-	Short: "shows summary information for an AWS service API",
-	RunE:  apiInfo,
+type APIFilter struct {
+	anyMatch []string
 }
 
-// apiOperationsCmd lists all operations for an AWS API service
-var apiOperationsCmd = &cobra.Command{
-	Use:     "operations",
-	Aliases: []string{"ops"},
-	Short:   "lists Operations for an AWS API service",
-	RunE:    apiOperations,
-}
-
-// apiResourcesCmd lists all resource object types for an AWS API service
-var apiResourcesCmd = &cobra.Command{
-	Use:   "resources",
-	Short: "lists Resource object types for an AWS API service",
-	RunE:  apiResources,
-}
-
-// apiObjectsCmd lists all object types for an AWS API service
-var apiObjectsCmd = &cobra.Command{
-	Use:   "objects",
-	Short: "lists Object types for an AWS API service",
-	RunE:  apiObjects,
-}
-
-// apiScalarsCmd lists all scalar types for an AWS API service
-var apiScalarsCmd = &cobra.Command{
-	Use:   "scalars",
-	Short: "lists Scalar types for an AWS API service",
-	RunE:  apiScalars,
-}
-
-// apiPayloadsCmd lists all payload types for an AWS API service
-var apiPayloadsCmd = &cobra.Command{
-	Use:   "payloads",
-	Short: "lists Payload types for an AWS API service",
-	RunE:  apiPayloads,
-}
-
-// apiExceptionsCmd lists all exception types for an AWS API service
-var apiExceptionsCmd = &cobra.Command{
-	Use:   "exceptions",
-	Short: "lists Exception types for an AWS API service",
-	RunE:  apiExceptions,
-}
-
-// apiListsCmd lists all list types for an AWS API service
-var apiListsCmd = &cobra.Command{
-	Use:   "lists",
-	Short: "lists List types for an AWS API service",
-	RunE:  apiLists,
-}
-
-// apiSchemaCmd shows a schema document for an AWS API service
-var apiSchemaCmd = &cobra.Command{
-	Use:   "schema",
-	Short: "shows schema information for an AWS service API",
-	RunE:  apiSchema,
-}
-
-func init() {
-	apiCmd.PersistentFlags().StringVarP(
-		&cliService, "service", "s", "", "Alias of the AWS service to work with.",
-	)
-	apiOperationsCmd.PersistentFlags().StringVar(
-		&cliOperationPrefixFilter, "prefix", "", "Comma-delimited list of string prefixes to filter operations by.",
-	)
-	apiOperationsCmd.PersistentFlags().StringVarP(
-		&cliHTTPMethodFilter, "method", "m", "", "Comma-delimited list of HTTP methods to filter operations by.",
-	)
-	apiCmd.MarkFlagRequired("service")
-	apiCmd.AddCommand(apiInfoCmd)
-	apiCmd.AddCommand(apiOperationsCmd)
-	apiCmd.AddCommand(apiResourcesCmd)
-	apiCmd.AddCommand(apiObjectsCmd)
-	apiCmd.AddCommand(apiScalarsCmd)
-	apiCmd.AddCommand(apiPayloadsCmd)
-	apiCmd.AddCommand(apiExceptionsCmd)
-	apiCmd.AddCommand(apiListsCmd)
-	rootCmd.AddCommand(apiCmd)
-}
-
-func ensureService() error {
+// getAPIs returns a slice of pointer to apimodel.API objects representing the
+// AWS service APIs listed in the models/apis/ directory of the aws-sdk-go
+// repository
+func getAPIs(
+	filter *APIFilter,
+) ([]*apimodel.API, error) {
 	sdkPath, err := ensureSDKRepo()
 	if err != nil {
-		return err
+		return nil, err
 	}
-	trace("fetching service information from aws-sdk-go ... \n")
-	svc, err := getService(sdkPath, cliService)
+	apis := []*apimodel.API{}
+
+	destPath := filepath.Join(sdkPath, "models", "apis")
+	apiDirs, err := ioutil.ReadDir(destPath)
 	if err != nil {
-		return err
+		return apis, err
 	}
-	serviceRef = &svc
-	return nil
+	for _, f := range apiDirs {
+		fname := f.Name()
+		fp := filepath.Join(destPath, fname)
+		fi, err := os.Lstat(fp)
+		if err != nil {
+			return apis, err
+		}
+		if !fi.IsDir() {
+			continue
+		}
+		// Filter just the services we're interested in
+		if filter != nil {
+			if !inStrings(fname, filter.anyMatch) {
+				continue
+			}
+		}
+		version, err := getAPIVersion(fp)
+		if err != nil {
+			return apis, err
+		}
+		versionPath := filepath.Join(fp, version)
+		api, err := getAPIFromVersionPath(fname, versionPath)
+		if err != nil {
+			return apis, err
+		}
+		apis = append(apis, api)
+	}
+	return apis, nil
 }
 
-func apiInfo(cmd *cobra.Command, args []string) error {
-	if err := ensureService(); err != nil {
-		return err
+// getAPI returns a pointer to an apimodel.API object representing a
+// specified AWS service
+func getAPI(
+	alias string,
+) (*apimodel.API, error) {
+	apis, err := getAPIs(&APIFilter{anyMatch: []string{alias}})
+	if err != nil {
+		return nil, err
 	}
-	printAPIInfo(serviceRef)
-	return nil
+	if len(apis) == 0 {
+		return nil, fmt.Errorf("unknown API %s", alias)
+	}
+	return apis[0], nil
 }
 
-func printAPIInfo(svc *Service) {
-	ops := svc.API.GetOperations(nil)
-	resources := svc.API.GetResources()
-	objects := svc.API.GetObjects()
-	scalars := svc.API.GetScalars()
-	payloads := svc.API.GetPayloads()
-	exceptions := svc.API.GetExceptions()
-	lists := svc.API.GetLists()
-	fmt.Printf("Full name:        %s\n", svc.API.Metadata.ServiceFullName)
-	fmt.Printf("API version:      %s\n", svc.API.Metadata.APIVersion)
-	fmt.Printf("Total operations: %d\n", len(ops))
-	fmt.Printf("Total resources:  %d\n", len(resources))
-	fmt.Printf("Total objects:    %d\n", len(objects))
-	fmt.Printf("Total scalars:    %d\n", len(scalars))
-	fmt.Printf("Total payloads:   %d\n", len(payloads))
-	fmt.Printf("Total exceptions: %d\n", len(exceptions))
-	fmt.Printf("Total lists:      %d\n", len(lists))
+func getAPIVersion(apiPath string) (string, error) {
+	versionDirs, err := ioutil.ReadDir(apiPath)
+	if err != nil {
+		return "", err
+	}
+	for _, f := range versionDirs {
+		version := f.Name()
+		fp := filepath.Join(apiPath, version)
+		fi, err := os.Lstat(fp)
+		if err != nil {
+			return "", err
+		}
+		if !fi.IsDir() {
+			return "", fmt.Errorf("expected to find only directories in api model directory %s but found non-directory %s", apiPath, fp)
+		}
+		// TODO(jaypipes): handle more than one version? doesn't seem like
+		// there is ever more than one.
+		return version, nil
+	}
+	return "", fmt.Errorf("expected to find at least one directory in api model directory %s", apiPath)
 }
 
-func apiOperations(cmd *cobra.Command, args []string) error {
-	if err := ensureService(); err != nil {
-		return err
-	}
-	printAPIOperations(serviceRef)
-	return nil
+func getAPIFromVersionPath(
+	alias string,
+	versionPath string,
+) (*apimodel.API, error) {
+	// in each models/apis/$service/$version/ directory will exist files like
+	// api-2.json, docs-2.json, etc. We want to grab the API model from the
+	// api-2.json file
+	modelPath := filepath.Join(versionPath, "api-2.json")
+	return apimodel.New(alias, modelPath)
 }
 
-func printAPIOperations(svc *Service) {
-	filter := &apimodel.OperationFilter{}
-	if cliHTTPMethodFilter != "" {
-		filter.Methods = strings.Split(strings.ToUpper(cliHTTPMethodFilter), ",")
-
+// cloneSDKRepo git clone's the aws-sdk-go source repo into the cache and
+// returns the filepath to the clone'd repo
+func cloneSDKRepo(srcPath string) (string, error) {
+	clonePath := filepath.Join(srcPath, "aws-sdk-go")
+	if _, err := os.Stat(clonePath); os.IsNotExist(err) {
+		cmd := exec.Command("git", "clone", "--depth", "1", sdkRepoURL, clonePath)
+		return clonePath, cmd.Run()
 	}
-	if cliOperationPrefixFilter != "" {
-		filter.Prefixes = strings.Split(cliOperationPrefixFilter, ",")
-	}
-	operations := svc.API.GetOperations(filter)
-	headers := []string{"Name", "HTTP Method"}
-	rows := make([][]string, len(operations))
-	for x, operation := range operations {
-		rows[x] = []string{operation.Name, operation.Method}
-	}
-	noResults(rows)
-	sort.Slice(rows, func(i, j int) bool {
-		return rows[i][0] < rows[j][0]
-	})
-	table := tablewriter.NewWriter(os.Stdout)
-	table.SetHeader(headers)
-	table.AppendBulk(rows)
-	table.Render()
+	return clonePath, nil
 }
 
-func apiResources(cmd *cobra.Command, args []string) error {
-	if err := ensureService(); err != nil {
-		return err
+func inStrings(subject string, collection []string) bool {
+	if len(collection) == 0 {
+		return true
 	}
-	printAPIResources(serviceRef)
-	return nil
-}
-
-func printAPIResources(svc *Service) {
-	resources := svc.API.GetResources()
-	headers := []string{"Name"}
-	rows := make([][]string, len(resources))
-	for x, resource := range resources {
-		rows[x] = []string{resource.SingularName}
+	for _, s := range collection {
+		if s == subject {
+			return true
+		}
 	}
-	noResults(rows)
-	sort.Slice(rows, func(i, j int) bool {
-		return rows[i][0] < rows[j][0]
-	})
-	table := tablewriter.NewWriter(os.Stdout)
-	table.SetHeader(headers)
-	table.AppendBulk(rows)
-	table.Render()
-}
-
-func apiObjects(cmd *cobra.Command, args []string) error {
-	if err := ensureService(); err != nil {
-		return err
-	}
-	printAPIObjects(serviceRef)
-	return nil
-}
-
-func printAPIObjects(svc *Service) {
-	objects := svc.API.GetObjects()
-	headers := []string{"Name"}
-	rows := make([][]string, len(objects))
-	for x, object := range objects {
-		rows[x] = []string{object.Name}
-	}
-	noResults(rows)
-	sort.Slice(rows, func(i, j int) bool {
-		return rows[i][0] < rows[j][0]
-	})
-	table := tablewriter.NewWriter(os.Stdout)
-	table.SetHeader(headers)
-	table.AppendBulk(rows)
-	table.Render()
-}
-
-func apiScalars(cmd *cobra.Command, args []string) error {
-	if err := ensureService(); err != nil {
-		return err
-	}
-	printAPIScalars(serviceRef)
-	return nil
-}
-
-func printAPIScalars(svc *Service) {
-	scalars := svc.API.GetScalars()
-	headers := []string{"Name", "Type"}
-	rows := make([][]string, len(scalars))
-	for x, scalar := range scalars {
-		rows[x] = []string{scalar.Name, scalar.Type}
-	}
-	noResults(rows)
-	sort.Slice(rows, func(i, j int) bool {
-		return rows[i][0] < rows[j][0]
-	})
-	table := tablewriter.NewWriter(os.Stdout)
-	table.SetHeader(headers)
-	table.AppendBulk(rows)
-	table.Render()
-}
-
-func apiPayloads(cmd *cobra.Command, args []string) error {
-	if err := ensureService(); err != nil {
-		return err
-	}
-	printAPIPayloads(serviceRef)
-	return nil
-}
-
-func printAPIPayloads(svc *Service) {
-	payloads := svc.API.GetPayloads()
-	headers := []string{"Name"}
-	rows := make([][]string, len(payloads))
-	for x, payload := range payloads {
-		rows[x] = []string{payload.Name}
-	}
-	noResults(rows)
-	sort.Slice(rows, func(i, j int) bool {
-		return rows[i][0] < rows[j][0]
-	})
-	table := tablewriter.NewWriter(os.Stdout)
-	table.SetHeader(headers)
-	table.AppendBulk(rows)
-	table.Render()
-}
-
-func apiExceptions(cmd *cobra.Command, args []string) error {
-	if err := ensureService(); err != nil {
-		return err
-	}
-	printAPIExceptions(serviceRef)
-	return nil
-}
-
-func printAPIExceptions(svc *Service) {
-	exceptions := svc.API.GetExceptions()
-	headers := []string{"Name"}
-	rows := make([][]string, len(exceptions))
-	for x, exception := range exceptions {
-		rows[x] = []string{exception.Name}
-	}
-	noResults(rows)
-	sort.Slice(rows, func(i, j int) bool {
-		return rows[i][0] < rows[j][0]
-	})
-	table := tablewriter.NewWriter(os.Stdout)
-	table.SetHeader(headers)
-	table.AppendBulk(rows)
-	table.Render()
-}
-
-func apiLists(cmd *cobra.Command, args []string) error {
-	if err := ensureService(); err != nil {
-		return err
-	}
-	printAPILists(serviceRef)
-	return nil
-}
-
-func printAPILists(svc *Service) {
-	lists := svc.API.GetLists()
-	headers := []string{"Name"}
-	rows := make([][]string, len(lists))
-	for x, list := range lists {
-		rows[x] = []string{list.Name}
-	}
-	noResults(rows)
-	sort.Slice(rows, func(i, j int) bool {
-		return rows[i][0] < rows[j][0]
-	})
-	table := tablewriter.NewWriter(os.Stdout)
-	table.SetHeader(headers)
-	table.AppendBulk(rows)
-	table.Render()
-}
-
-func apiSchema(cmd *cobra.Command, args []string) error {
-	if err := ensureService(); err != nil {
-		return err
-	}
-	printAPISchema(serviceRef)
-	return nil
-}
-
-func printAPISchema(svc *Service) {
-	lists := svc.API.GetLists()
-	headers := []string{"Name"}
-	rows := make([][]string, len(lists))
-	for x, list := range lists {
-		rows[x] = []string{list.Name}
-	}
-	noResults(rows)
-	sort.Slice(rows, func(i, j int) bool {
-		return rows[i][0] < rows[j][0]
-	})
-	table := tablewriter.NewWriter(os.Stdout)
-	table.SetHeader(headers)
-	table.AppendBulk(rows)
-	table.Render()
+	return false
 }

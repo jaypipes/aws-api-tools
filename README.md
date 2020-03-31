@@ -19,10 +19,10 @@ which will install the binary into your `$GOPATH/bin` directory.
 
 ### List AWS service APIs
 
-Use the `aws-api-tool service list` command to list AWS services:
+Use the `aws-api-tool list-apis` command to list AWS services:
 
 ```
-$ aws-api-tool service list
+$ aws-api-tool list-apis
 +------------------------------+-------------+------------------------------------+
 |            ALIAS             | API VERSION |             FULL NAME              |
 +------------------------------+-------------+------------------------------------+
@@ -38,7 +38,7 @@ You can filter the results using the `--filter` flag, which accepts a
 comma-delimited string of strings to match for the service's alias:
 
 ```
-$ aws-api-tool service list --filter ebs,sdb
+$ aws-api-tool list-apis --filter ebs,sdb
 +-------+-------------+----------------------------+
 | ALIAS | API VERSION |         FULL NAME          |
 +-------+-------------+----------------------------+
@@ -47,37 +47,32 @@ $ aws-api-tool service list --filter ebs,sdb
 +-------+-------------+----------------------------+
 ```
 
-### Explore an AWS service API
-
-Explore information about a particular AWS service API with the `aws-api-tool
-api` command. This command and all of its subcommands accepts a single
-`--service` argument which should be the alias of a service.
-
-#### Get summary information about an API
+### Get summary information about an API
 
 To get summary information about a particular AWS service API, use the
-`aws-api-tool api info` command.
+`aws-api-tool info <api>` command.
 
 ```
-$ aws-api-tool api --service sns info
-Full name:        Amazon Simple Notification Service
-API version:      2010-03-31
-Total operations: 33
-Total resources:  3
-Total objects:    6
-Total scalars:    30
-Total payloads:   56
-Total exceptions: 23
-Total lists:      10
+$ aws-api-tool info ec2
+Full name:        Amazon Elastic Compute Cloud
+API version:      2016-11-15
+Protocol:         ec2
+Total operations: 400
+Total resources:  52
+Total objects:    1991
+Total scalars:    383
+Total payloads:   738
+Total exceptions: 0
+Total lists:      405
 ```
 
-#### List API operations
+### List API operations
 
-To list operations for an AWS service API, use the `aws-api-tool api
-operations` command:
+To list operations for an AWS service API, use the `aws-api-tool
+list-operations <api>` command:
 
 ```
-$ aws-api-tool api --service sns operations
+$ aws-api-tool list-operations sns
 +------------------------------------+-------------+
 |                NAME                | HTTP METHOD |
 +------------------------------------+-------------+
@@ -122,7 +117,7 @@ take a comma-delimited string of HTTP methods or string name prefixes to filter
 results by:
 
 ```
-$ aws-api-tool api --service ec2 operations --prefix Update,Delete
+$ aws-api-tool list-operations sns --prefix Update,Delete
 +--------------------------------------------+-------------+
 |                    NAME                    | HTTP METHOD |
 +--------------------------------------------+-------------+
@@ -176,7 +171,10 @@ $ aws-api-tool api --service ec2 operations --prefix Update,Delete
 | UpdateSecurityGroupRuleDescriptionsEgress  | POST        |
 | UpdateSecurityGroupRuleDescriptionsIngress | POST        |
 +--------------------------------------------+-------------+
-$ aws-api-tool api --service s3 operations --method GET --prefix ListO
+```
+
+```
+$ aws-api-tool list-operations s3 --method GET --prefix ListO
 +--------------------+-------------+
 |        NAME        | HTTP METHOD |
 +--------------------+-------------+
@@ -185,16 +183,17 @@ $ aws-api-tool api --service s3 operations --method GET --prefix ListO
 | ListObjectsV2      | GET         |
 +--------------------+-------------+
 ```
+
 #### List API resource objects
 
 Resource objects are those objects that are "top-level" constructs in an API.
 These resource objects correspond to the core structures exposed in the API with
 Create, Read, Update and Delete operations.
 
-Use the `aws-api-tool api resources` command to list these resource objects:
+Use the `aws-api-tool list-resources <api>` command to list these resource objects:
 
 ```
-$ aws-api-tool api --service sqs resources
+$ aws-api-tool list-resources sqs
 +-------+
 | NAME  |
 +-------+
@@ -207,7 +206,7 @@ contained within another object, it is not a resource object. For example, the
 AWS APIGateway API has the following Create operations:
 
 ```
-$ aws-api-tool api --service apigateway operations --prefix Create
+$ aws-api-tool list-operations apigateway --prefix Create
 +----------------------------+-------------+
 |            NAME            | HTTP METHOD |
 +----------------------------+-------------+
@@ -233,7 +232,7 @@ However, of the above, only the `ApiKey`, `DomainName`, `RestApi`, `UsagePlan` a
 `VpcLink` are resources:
 
 ```
-$ aws-api-tool api --service apigateway resources
+$ aws-api-tool list-resources apigateway
 +------------+
 |    NAME    |
 +------------+
@@ -251,204 +250,55 @@ object; it cannot be created as a separate thing.
 
 #### List API objects
 
-Objects are those elements of the API that are **NOT** Lists, Payloads or
-Scalar types. You can think of objects as complex types that contain a set of
-fields that may be other objects or scalar types.
-
-Use the `aws-api-tool api objects` command to list an API's objects:
+Use the `aws-api-tool list-objects <api>` command to list an API's objects. You
+can use the `--type` flag to filter objects by type ("scalar", "list",
+"payload" and "exception"):
 
 ```
-$ aws-api-tool api --service ecr objects
-+-------------------------------+
-|             NAME              |
-+-------------------------------+
-| Attribute                     |
-| AuthorizationData             |
-| DescribeImagesFilter          |
-| Image                         |
-| ImageDetail                   |
-| ImageFailure                  |
-| ImageIdentifier               |
-| ImageScanFinding              |
-| ImageScanFindings             |
-| ImageScanFindingsSummary      |
-| ImageScanStatus               |
-| ImageScanningConfiguration    |
-| Layer                         |
-| LayerFailure                  |
-| LifecyclePolicyPreviewFilter  |
-| LifecyclePolicyPreviewResult  |
-| LifecyclePolicyPreviewSummary |
-| LifecyclePolicyRuleAction     |
-| ListImagesFilter              |
-| Repository                    |
-| Tag                           |
-+-------------------------------+
-```
-
-#### List API scalars
-
-Scalars are concepts of the API that are neither structure objects or list
-objects. They are the simplest data types in the API.
-
-Use the `aws-api-tool api scalars` command to list scalars:
-
-```
-$ go run cmd/aws-api-tool/main.go api --service sqs scalars
-+------------------------------------+---------+
-|                NAME                |  TYPE   |
-+------------------------------------+---------+
-| Binary                             | blob    |
-| Boolean                            | boolean |
-| Integer                            | integer |
-| MessageAttributeName               | string  |
-| MessageBodyAttributeMap            | map     |
-| MessageBodySystemAttributeMap      | map     |
-| MessageSystemAttributeMap          | map     |
-| MessageSystemAttributeName         | string  |
-| MessageSystemAttributeNameForSends | string  |
-| QueueAttributeMap                  | map     |
-| QueueAttributeName                 | string  |
-| String                             | string  |
-| TagKey                             | string  |
-| TagMap                             | map     |
-| TagValue                           | string  |
-+------------------------------------+---------+
-```
-
-#### List API list objects
-
-List objects are constructs in the API that serve only as collections of a
-single scalar or object type.
-
-List an API's list objects with the `aws-api-tool api lists` command:
-
-```
-$ aws-api-tool api --service s3 lists
-+---------------------------------+
-|              NAME               |
-+---------------------------------+
-| AllowedHeaders                  |
-| AllowedMethods                  |
-| AllowedOrigins                  |
-| AnalyticsConfigurationList      |
-| Buckets                         |
-| CORSRules                       |
-| CommonPrefixList                |
-| CompletedPartList               |
-| DeleteMarkers                   |
-| DeletedObjects                  |
-| Errors                          |
-| EventList                       |
-| ExposeHeaders                   |
-| FilterRuleList                  |
-| Grants                          |
-| InventoryConfigurationList      |
-| InventoryOptionalFields         |
-| LambdaFunctionConfigurationList |
-| LifecycleRules                  |
-| MetricsConfigurationList        |
-| MultipartUploadList             |
-| NoncurrentVersionTransitionList |
-| ObjectIdentifierList            |
-| ObjectList                      |
-| ObjectVersionList               |
-| Parts                           |
-| QueueConfigurationList          |
-| ReplicationRules                |
-| RoutingRules                    |
-| Rules                           |
-| ServerSideEncryptionRules       |
-| TagSet                          |
-| TargetGrants                    |
-| TopicConfigurationList          |
-| TransitionList                  |
-| UserMetadata                    |
-+---------------------------------+
-```
-
-#### List API payloads
-
-Payload objects are constructs in the API that represent the input or output
-payload for an individual HTTP request.
-
-Use the `aws-api-tool api payloads` command to list these payload objects:
-
-
-```
-$ go run cmd/aws-api-tool/main.go api --service ecr payloads
-+---------------------------------------+
-|                 NAME                  |
-+---------------------------------------+
-| BatchCheckLayerAvailabilityRequest    |
-| BatchCheckLayerAvailabilityResponse   |
-| BatchDeleteImageRequest               |
-| BatchDeleteImageResponse              |
-| BatchGetImageRequest                  |
-| BatchGetImageResponse                 |
-| CompleteLayerUploadRequest            |
-| CompleteLayerUploadResponse           |
-| CreateRepositoryRequest               |
-| CreateRepositoryResponse              |
-| DeleteLifecyclePolicyRequest          |
-| DeleteLifecyclePolicyResponse         |
-| DeleteRepositoryPolicyRequest         |
-| DeleteRepositoryPolicyResponse        |
-| DeleteRepositoryRequest               |
-| DeleteRepositoryResponse              |
-| DescribeImageScanFindingsRequest      |
-| DescribeImageScanFindingsResponse     |
-| DescribeImagesRequest                 |
-| DescribeImagesResponse                |
-| DescribeRepositoriesRequest           |
-| DescribeRepositoriesResponse          |
-| GetAuthorizationTokenRequest          |
-| GetAuthorizationTokenResponse         |
-| GetDownloadUrlForLayerRequest         |
-| GetDownloadUrlForLayerResponse        |
-| GetLifecyclePolicyPreviewRequest      |
-| GetLifecyclePolicyPreviewResponse     |
-| GetLifecyclePolicyRequest             |
-| GetLifecyclePolicyResponse            |
-| GetRepositoryPolicyRequest            |
-| GetRepositoryPolicyResponse           |
-| InitiateLayerUploadRequest            |
-| InitiateLayerUploadResponse           |
-| ListImagesRequest                     |
-| ListImagesResponse                    |
-| ListTagsForResourceRequest            |
-| ListTagsForResourceResponse           |
-| PutImageRequest                       |
-| PutImageResponse                      |
-| PutImageScanningConfigurationRequest  |
-| PutImageScanningConfigurationResponse |
-| PutImageTagMutabilityRequest          |
-| PutImageTagMutabilityResponse         |
-| PutLifecyclePolicyRequest             |
-| PutLifecyclePolicyResponse            |
-| SetRepositoryPolicyRequest            |
-| SetRepositoryPolicyResponse           |
-| StartImageScanRequest                 |
-| StartImageScanResponse                |
-| StartLifecyclePolicyPreviewRequest    |
-| StartLifecyclePolicyPreviewResponse   |
-| TagResourceRequest                    |
-| TagResourceResponse                   |
-| UntagResourceRequest                  |
-| UntagResourceResponse                 |
-| UploadLayerPartRequest                |
-| UploadLayerPartResponse               |
-+---------------------------------------+
+$ aws-api-tool list-objects sns --type scalar
++---------------------------+-------------+-----------+
+|           NAME            | OBJECT TYPE | DATA TYPE |
++---------------------------+-------------+-----------+
+| AmazonResourceName        | scalar      | string    |
+| Binary                    | scalar      | blob      |
+| MapStringToString         | scalar      | map       |
+| MessageAttributeMap       | scalar      | map       |
+| PhoneNumber               | scalar      | string    |
+| String                    | scalar      | string    |
+| SubscriptionAttributesMap | scalar      | map       |
+| TagKey                    | scalar      | string    |
+| TagValue                  | scalar      | string    |
+| TopicAttributesMap        | scalar      | map       |
+| account                   | scalar      | string    |
+| action                    | scalar      | string    |
+| attributeName             | scalar      | string    |
+| attributeValue            | scalar      | string    |
+| authenticateOnUnsubscribe | scalar      | string    |
+| boolean                   | scalar      | boolean   |
+| delegate                  | scalar      | string    |
+| endpoint                  | scalar      | string    |
+| label                     | scalar      | string    |
+| message                   | scalar      | string    |
+| messageId                 | scalar      | string    |
+| messageStructure          | scalar      | string    |
+| nextToken                 | scalar      | string    |
+| protocol                  | scalar      | string    |
+| string                    | scalar      | string    |
+| subject                   | scalar      | string    |
+| subscriptionARN           | scalar      | string    |
+| token                     | scalar      | string    |
+| topicARN                  | scalar      | string    |
+| topicName                 | scalar      | string    |
++---------------------------+-------------+-----------+
 ```
 
 #### Show OpenAPI3 Schema for API resource
 
-Use the `aws-api-tool schema openapi` command to display the OpenAPI3 Schema
-for a specific resource in an AWS Service API. Specify the service with the
-`--service` flag and the resource using the `--resource` flag:
+Use the `aws-api-tool schema <api> <resource>` command to display the OpenAPI3
+Schema for a specific resource in an AWS Service API.
 
 ```
-$ aws-api-tool schema --service sqs --resource Queue openapi
+$ aws-api-tool schema sqs Queue
 properties:
   Attributes:
     additionalProperties: true
@@ -464,7 +314,7 @@ type: object
 ```
 
 ```
-$ aws-api-tool schema --service sns --resource Topic openapi
+$ aws-api-tool schema sns Topic
 properties:
   Attributes:
     additionalProperties: true
@@ -491,12 +341,12 @@ uses the lowercase name "tags" to refer to a simple `map[string]string` whereas
 the AWS SNS Topic resource uses the CamelCased name "Tags" and uses a list of
 objects with a "Key" and "Value" property.
 
-**NOTE**: By default, the `aws-api-tool schema openapi` command outputs the
+**NOTE**: By default, the `aws-api-tool schema <api> <resource>` command outputs the
 OpenAPI3 Schema as YAML. You can output condensed JSON instead using the
 `--output json` flag:
 
 
 ```
-$ aws-api-tool schema --service sqs --resource Queue openapi --format json
+$ aws-api-tool schema sqs Queue --format json
 {"properties":{"Attributes":{"additionalProperties":true,"type":"object"},"QueueName":{"type":"string"},"QueueUrl":{"type":"string"},"tags":{"additionalProperties":true,"type":"object"}},"type":"object"}
 ```

@@ -14,9 +14,9 @@ import (
 )
 
 type metadataSpec struct {
-	APIVersion      string `json:"apiVersion"`
-	ServiceFullName string `json:"serviceFullName"`
-	Protocol        string `json:"protocol"`
+	APIVersion string `json:"apiVersion"`
+	FullName   string `json:"serviceFullName"`
+	Protocol   string `json:"protocol"`
 }
 
 type shapeRefSpec struct {
@@ -50,7 +50,7 @@ type apiSpec struct {
 	Shapes     map[string]shapeSpec `json:"shapes"`
 }
 
-func ParseFrom(modelPath string) (*API, error) {
+func parseFrom(modelPath string) (*apiSpec, error) {
 	if _, err := os.Stat(modelPath); os.IsNotExist(err) {
 		return nil, fmt.Errorf("expected to find %s", modelPath)
 	}
@@ -59,60 +59,60 @@ func ParseFrom(modelPath string) (*API, error) {
 	if err = json.Unmarshal(b, &spec); err != nil {
 		return nil, err
 	}
-
-	api, err := apiFromSpec(&spec)
-	if err != nil {
-		return nil, err
-	}
-	return api, nil
+	return &spec, nil
 }
 
-func apiFromSpec(spec *apiSpec) (*API, error) {
-	api := API{
-		Metadata:     spec.Metadata,
-		shapeMap:     make(map[string]Shape, len(spec.Shapes)),
-		opMap:        make(map[string]Operation, len(spec.Operations)),
-		payloadMap:   map[string]*Shape{},
-		scalarMap:    map[string]*Shape{},
-		exceptionMap: map[string]*Shape{},
-		objectMap:    map[string]*Shape{},
-		listMap:      map[string]*Shape{},
-		resourceMap:  map[string]*Resource{},
+func (api *API) eval() error {
+	if len(api.objectMap) > 0 {
+		return nil
 	}
-	// Populate the base shape and operation maps
+	spec := api.apiSpec
+	api.objectMap = make(map[string]*Object, len(spec.Shapes))
+	api.opMap = make(map[string]Operation, len(spec.Operations))
+	api.payloadMap = map[string]*Object{}
+	api.scalarMap = map[string]*Object{}
+	api.exceptionMap = map[string]*Object{}
+	api.listMap = map[string]*Object{}
+	api.resourceMap = map[string]*Resource{}
+
+	// Populate the base object maps
 	for shapeName, shapeSpec := range spec.Shapes {
-		shape := Shape{
+		obj := Object{
 			Name:                shapeName,
-			Type:                shapeSpec.Type,
-			Members:             make(map[string]*Shape, len(shapeSpec.Members)),
+			Type:                ObjectTypeObject,
+			DataType:            shapeSpec.Type,
+			Members:             make(map[string]*Object, len(shapeSpec.Members)),
 			RequiredMemberNames: shapeSpec.Required,
 		}
-		api.shapeMap[shapeName] = shape
-
 		// Determine simple types like scalars, lists and exceptions
 		if shapeSpec.Type != "structure" && shapeSpec.Type != "list" {
-			api.scalarMap[shapeName] = &shape
+			obj.Type = ObjectTypeScalar
+			api.scalarMap[shapeName] = &obj
 		} else if shapeSpec.Type == "structure" && shapeSpec.Exception {
-			api.exceptionMap[shapeName] = &shape
+			obj.Type = ObjectTypeException
+			api.exceptionMap[shapeName] = &obj
 		} else if shapeSpec.Type == "list" {
-			api.listMap[shapeName] = &shape
+			obj.Type = ObjectTypeList
+			api.listMap[shapeName] = &obj
 		}
+		api.objectMap[shapeName] = &obj
+
 	}
 
-	// Set each shape's field references
+	// Set each object's member references
 	for shapeName, shapeSpec := range spec.Shapes {
-		shape, found := api.shapeMap[shapeName]
+		obj, found := api.objectMap[shapeName]
 		if !found {
-			return nil, fmt.Errorf("expected to find shape %s in shapeMap", shapeName)
+			return fmt.Errorf("expected to find object %s in objectMap", shapeName)
 		}
 		// List types are special...
 		if shapeSpec.ListMember != nil {
 			listMemberShapeName := *shapeSpec.ListMember.ShapeName
-			listMemberShape, found := api.shapeMap[listMemberShapeName]
+			listMemberObj, found := api.objectMap[listMemberShapeName]
 			if !found {
-				return nil, fmt.Errorf("expected to find member shape %s in shapeMap", listMemberShapeName)
+				return fmt.Errorf("expected to find member object %s in objectMap", listMemberShapeName)
 			}
-			shape.Members[listMemberShapeName] = &listMemberShape
+			obj.Members[listMemberShapeName] = listMemberObj
 			continue
 		}
 		if len(shapeSpec.Members) == 0 {
@@ -124,11 +124,11 @@ func apiFromSpec(spec *apiSpec) (*API, error) {
 				continue
 			}
 			memberShapeName := *memberShapeRef.ShapeName
-			memberShape, found := api.shapeMap[memberShapeName]
+			memberObj, found := api.objectMap[memberShapeName]
 			if !found {
-				return nil, fmt.Errorf("expected to find member shape %s in shapeMap", memberShapeName)
+				return fmt.Errorf("expected to find member object %s in objectMap", memberShapeName)
 			}
-			shape.Members[memberName] = &memberShape
+			obj.Members[memberName] = memberObj
 			x++
 		}
 	}
@@ -140,59 +140,43 @@ func apiFromSpec(spec *apiSpec) (*API, error) {
 		}
 		if opSpec.Input.ShapeName != nil {
 			inShapeName := *opSpec.Input.ShapeName
-			inShape, ok := api.shapeMap[inShapeName]
+			inObj, ok := api.objectMap[inShapeName]
 			if !ok {
-				return nil, fmt.Errorf("expected to find shape %s", inShapeName)
+				return fmt.Errorf("expected to find object %s", inShapeName)
 			}
-			api.payloadMap[inShapeName] = &inShape
-			op.Input = &inShape
+			inObj.Type = ObjectTypePayload
+			api.payloadMap[inShapeName] = inObj
+			op.Input = inObj
 		}
 		if opSpec.Output.ShapeName != nil {
 			outShapeName := *opSpec.Output.ShapeName
-			outShape, ok := api.shapeMap[outShapeName]
+			outObj, ok := api.objectMap[outShapeName]
 			if !ok {
-				return nil, fmt.Errorf("expected to find shape %s", outShapeName)
+				return fmt.Errorf("expected to find object %s", outShapeName)
 			}
-			api.payloadMap[outShapeName] = &outShape
-			op.Output = &outShape
+			outObj.Type = ObjectTypePayload
+			api.payloadMap[outShapeName] = outObj
+			op.Output = outObj
 		}
 		if len(opSpec.Errors) > 0 {
-			errs := make([]*Shape, len(opSpec.Errors))
+			errs := make([]*Object, len(opSpec.Errors))
 			for x, errShapeRef := range opSpec.Errors {
 				errShapeName := *errShapeRef.ShapeName
-				errShape, ok := api.shapeMap[errShapeName]
+				errObj, ok := api.objectMap[errShapeName]
 				if !ok {
-					return nil, fmt.Errorf("expected to find shape %s", errShapeName)
+					return fmt.Errorf("expected to find object %s", errShapeName)
 				}
-				errs[x] = &errShape
+				errs[x] = errObj
 			}
 			op.Errors = errs
 		}
 		api.opMap[opName] = op
 	}
 
-	// objects are the shapes that are *not* payloads, scalars or exceptions
-	for shapeName, _ := range spec.Shapes {
-		if _, found := api.scalarMap[shapeName]; found {
-			continue
-		}
-		if _, found := api.payloadMap[shapeName]; found {
-			continue
-		}
-		if _, found := api.listMap[shapeName]; found {
-			continue
-		}
-		if _, found := api.exceptionMap[shapeName]; found {
-			continue
-		}
-		objShape := api.shapeMap[shapeName]
-		api.objectMap[shapeName] = &objShape
-	}
-
-	resources, err := getResources(&api)
+	resources, err := getResources(api)
 	if err != nil {
-		return nil, err
+		return err
 	}
 	api.resourceMap = resources
-	return &api, nil
+	return nil
 }

@@ -71,7 +71,7 @@ import (
 
 func getResources(api *API) (map[string]*Resource, error) {
 	pluralize := pluralize.NewClient()
-	apiProtocol := api.Metadata.Protocol
+	apiProtocol := api.Protocol
 	resources := map[string]*Resource{}
 	filter := &OperationFilter{
 		Prefixes: []string{"Create"},
@@ -119,15 +119,15 @@ func getResources(api *API) (map[string]*Resource, error) {
 		// add a pointer to an openapi3.Schema describing the input shape
 		if createOp.Input != nil {
 			inShapeName := createOp.Input.Name
-			inShape, found := api.shapeMap[inShapeName]
+			inObj, found := api.objectMap[inShapeName]
 			if !found {
 				return nil, fmt.Errorf("expected to find input shape %s", inShapeName)
 			}
-			if inShape.Type != "structure" {
-				return nil, fmt.Errorf("expected to find a structure type for input shape %s but found %s", inShapeName, inShape.Type)
+			if inObj.DataType != "structure" {
+				return nil, fmt.Errorf("expected to find a structure type for input shape %s but found %s", inShapeName, inObj.Type)
 			}
-			for memberName, member := range inShape.Members {
-				resource.Properties[memberName] = shapeToOAI3Schema(member)
+			for memberName, member := range inObj.Members {
+				resource.Properties[memberName] = objectToOAI3Schema(member)
 			}
 		}
 		// Find the shape representing the ouput of the create operation and
@@ -135,15 +135,15 @@ func getResources(api *API) (map[string]*Resource, error) {
 		// fields already added from the input
 		if createOp.Output != nil {
 			outShapeName := createOp.Output.Name
-			outShape, found := api.shapeMap[outShapeName]
+			outObj, found := api.objectMap[outShapeName]
 			if !found {
 				return nil, fmt.Errorf("expected to find output shape %s", outShapeName)
 			}
-			if outShape.Type != "structure" {
-				return nil, fmt.Errorf("expected to find a structure type for output shape %s but found %s", outShapeName, outShape.Type)
+			if outObj.DataType != "structure" {
+				return nil, fmt.Errorf("expected to find a structure type for output shape %s but found %s", outShapeName, outObj.Type)
 			}
 
-			var membersToProcess *map[string]*Shape = &outShape.Members
+			var membersToProcess *map[string]*Object = &outObj.Members
 
 			// Often (but annoyingly not always), the API's response will wrap
 			// the returned members with a single wrapper member named the same
@@ -159,10 +159,10 @@ func getResources(api *API) (map[string]*Resource, error) {
 			//
 			// If this is the case, we go ahead and "flatten" things by
 			// processing the single member's members...
-			if len(outShape.Members) == 1 {
-				for memberShapeName, memberShape := range outShape.Members {
+			if len(outObj.Members) == 1 {
+				for memberShapeName, memberObj := range outObj.Members {
 					if strings.ToLower(singularName) == strings.ToLower(memberShapeName) {
-						membersToProcess = &memberShape.Members
+						membersToProcess = &memberObj.Members
 						break
 					}
 				}
@@ -170,7 +170,7 @@ func getResources(api *API) (map[string]*Resource, error) {
 
 			for memberName, member := range *membersToProcess {
 				if _, found := resource.Properties[memberName]; !found {
-					resource.Properties[memberName] = shapeToOAI3Schema(member)
+					resource.Properties[memberName] = objectToOAI3Schema(member)
 				}
 			}
 		}
@@ -179,9 +179,9 @@ func getResources(api *API) (map[string]*Resource, error) {
 	return resources, nil
 }
 
-func shapeToOAI3Schema(shape *Shape) *openapi3.Schema {
+func objectToOAI3Schema(object *Object) *openapi3.Schema {
 	var schema *openapi3.Schema
-	switch shape.Type {
+	switch object.DataType {
 	case "string":
 		schema = openapi3.NewStringSchema()
 	case "long", "integer":
@@ -196,16 +196,16 @@ func shapeToOAI3Schema(shape *Shape) *openapi3.Schema {
 		schema = openapi3.NewObjectSchema().WithAnyAdditionalProperties()
 	case "list":
 		schema = openapi3.NewArraySchema()
-		for _, memberShape := range shape.Members {
-			itemsSchema := shapeToOAI3Schema(memberShape)
+		for _, memberObj := range object.Members {
+			itemsSchema := objectToOAI3Schema(memberObj)
 			schema.WithItems(itemsSchema)
 			break
 		}
 	case "structure":
 		schema = openapi3.NewObjectSchema()
 		memberProps := map[string]*openapi3.Schema{}
-		for memberName, memberShape := range shape.Members {
-			memberProps[memberName] = shapeToOAI3Schema(memberShape)
+		for memberName, memberObj := range object.Members {
+			memberProps[memberName] = objectToOAI3Schema(memberObj)
 		}
 		schema.WithProperties(memberProps)
 	}

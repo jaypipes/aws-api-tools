@@ -13,10 +13,19 @@ import (
 	"github.com/getkin/kin-openapi/openapi3"
 )
 
-type Shape struct {
+const (
+	ObjectTypeObject    = "object"
+	ObjectTypeScalar    = "scalar"
+	ObjectTypePayload   = "payload"
+	ObjectTypeException = "exception"
+	ObjectTypeList      = "list"
+)
+
+type Object struct {
 	Name                string
 	Type                string
-	Members             map[string]*Shape
+	DataType            string
+	Members             map[string]*Object
 	RequiredMemberNames []string
 }
 
@@ -24,9 +33,9 @@ type Operation struct {
 	Name       string
 	Method     string
 	RequestURI string
-	Input      *Shape
-	Output     *Shape
-	Errors     []*Shape
+	Input      *Object
+	Output     *Object
+	Errors     []*Object
 }
 
 type Resource struct {
@@ -36,15 +45,32 @@ type Resource struct {
 }
 
 type API struct {
-	Metadata     metadataSpec
+	Alias        string
+	FullName     string
+	Protocol     string
+	Version      string
+	apiSpec      *apiSpec
 	opMap        map[string]Operation
-	shapeMap     map[string]Shape
-	payloadMap   map[string]*Shape
-	scalarMap    map[string]*Shape
-	exceptionMap map[string]*Shape
-	objectMap    map[string]*Shape
-	listMap      map[string]*Shape
+	objectMap    map[string]*Object
+	payloadMap   map[string]*Object
+	scalarMap    map[string]*Object
+	exceptionMap map[string]*Object
+	listMap      map[string]*Object
 	resourceMap  map[string]*Resource
+}
+
+func New(alias string, modelPath string) (*API, error) {
+	spec, err := parseFrom(modelPath)
+	if err != nil {
+		return nil, err
+	}
+	return &API{
+		Alias:    alias,
+		FullName: spec.Metadata.FullName,
+		Version:  spec.Metadata.APIVersion,
+		Protocol: spec.Metadata.Protocol,
+		apiSpec:  spec,
+	}, nil
 }
 
 type OperationFilter struct {
@@ -55,6 +81,7 @@ type OperationFilter struct {
 // GetOperations returns the Shapes in the API that are of a non-compound type
 // by returning a map of the shape name and its underlying simple type
 func (a *API) GetOperations(filter *OperationFilter) []*Operation {
+	a.eval()
 	res := []*Operation{}
 	for opName, op := range a.opMap {
 		if filter != nil {
@@ -77,33 +104,10 @@ func (a *API) GetOperations(filter *OperationFilter) []*Operation {
 	return res
 }
 
-// GetScalars returns the Shapes in the API that are of a non-compound type by
-// returning a map of the shape name and its underlying simple type
-func (a *API) GetScalars() []*Shape {
-	res := make([]*Shape, len(a.scalarMap))
-	x := 0
-	for _, scalar := range a.scalarMap {
-		res[x] = scalar
-		x++
-	}
-	return res
-}
-
-// GetPayloads returns the Shapes in the API that are used as input or output
-// payload wrappers
-func (a *API) GetPayloads() []*Shape {
-	res := make([]*Shape, len(a.payloadMap))
-	x := 0
-	for _, payload := range a.payloadMap {
-		res[x] = payload
-		x++
-	}
-	return res
-}
-
 // GetResources returns objects that have been identified as top-level resource
 // structures for the API.
 func (a *API) GetResources() []*Resource {
+	a.eval()
 	res := make([]*Resource, len(a.resourceMap))
 	x := 0
 	for _, resource := range a.resourceMap {
@@ -115,6 +119,7 @@ func (a *API) GetResources() []*Resource {
 
 // GetResource returns a Resource with the specified name
 func (a *API) GetResource(resourceName string) (*Resource, error) {
+	a.eval()
 	r, found := a.resourceMap[resourceName]
 	if !found {
 		return nil, fmt.Errorf("no such resource '%s'", resourceName)
@@ -122,36 +127,31 @@ func (a *API) GetResource(resourceName string) (*Resource, error) {
 	return r, nil
 }
 
-// GetObjects returns shapes that are *not* payloads, scalars, lists or
-// exceptions
-func (a *API) GetObjects() []*Shape {
-	res := make([]*Shape, len(a.objectMap))
-	x := 0
-	for _, object := range a.objectMap {
-		res[x] = object
-		x++
-	}
-	return res
+type ObjectFilter struct {
+	Types    []string
+	Prefixes []string
 }
 
-// GetExceptions returns all Shapes that are exception classes
-func (a *API) GetExceptions() []*Shape {
-	res := make([]*Shape, len(a.exceptionMap))
-	x := 0
-	for _, exception := range a.exceptionMap {
-		res[x] = exception
-		x++
-	}
-	return res
-}
-
-// GetLists returns all Shapes that are list classes
-func (a *API) GetLists() []*Shape {
-	res := make([]*Shape, len(a.listMap))
-	x := 0
-	for _, list := range a.listMap {
-		res[x] = list
-		x++
+// GetObjects returns objects that match any of the supplied filter
+func (a *API) GetObjects(filter *ObjectFilter) []*Object {
+	a.eval()
+	res := []*Object{}
+	for objectName, object := range a.objectMap {
+		if filter != nil {
+			if len(filter.Types) > 0 {
+				// Match on any of the supplied object types
+				if !inStrings(object.Type, filter.Types) {
+					continue
+				}
+			}
+			if len(filter.Prefixes) > 0 {
+				// Match on any of the supplied prefixes
+				if !hasAnyPrefix(objectName, filter.Prefixes) {
+					continue
+				}
+			}
+		}
+		res = append(res, object)
 	}
 	return res
 }

@@ -7,6 +7,7 @@
 package command
 
 import (
+	"errors"
 	"fmt"
 
 	"github.com/ghodss/yaml"
@@ -14,51 +15,36 @@ import (
 )
 
 var (
-	cliResource     string
 	cliOutputFormat string
 )
-
-// resourceCmd provides sub-commands for exploring a specific resource in an
-// AWS service API
-var schemaCmd = &cobra.Command{
-	Use:   "schema",
-	Short: "query and transform information about a specific resource in an AWS service API",
+var requireAPIAndResourceArg = func(cmd *cobra.Command, args []string) error {
+	if len(args) != 2 {
+		return errors.New("requires an <api> and <resource> argument")
+	}
+	return nil
 }
 
-// resourceSchemaCmd shows an OpenAPI3 Schema for a specific resource in an AWS
-// service APi
-var openapi3SchemaCmd = &cobra.Command{
-	Use:     "openapi3",
-	Aliases: []string{"oai3", "openapi"},
-	Short:   "display OpenAPI3 Schema for a specific resource in an AWS service API",
-	RunE:    openapi3Schema,
+// schemaCmd shows a schema document for an AWS API service and resource
+var schemaCmd = &cobra.Command{
+	Use:   "schema <api> <resource>",
+	Short: "shows schema information for an AWS service API and resource",
+	Args:  requireAPIAndResourceArg,
+	RunE:  resourceSchema,
 }
 
 func init() {
 	schemaCmd.PersistentFlags().StringVarP(
 		&cliOutputFormat, "format", "f", "yaml", "Output format for schema ('yaml' or 'json').",
 	)
-	schemaCmd.PersistentFlags().StringVarP(
-		&cliService, "service", "s", "", "Alias of the AWS service to work with.",
-	)
-	schemaCmd.MarkFlagRequired("service")
-	schemaCmd.PersistentFlags().StringVarP(
-		&cliResource, "resource", "r", "", "Name of the API resource to work with.",
-	)
-	schemaCmd.MarkFlagRequired("resource")
-	schemaCmd.AddCommand(openapi3SchemaCmd)
 	rootCmd.AddCommand(schemaCmd)
 }
 
-func openapi3Schema(cmd *cobra.Command, args []string) error {
-	if err := ensureService(); err != nil {
+func resourceSchema(cmd *cobra.Command, args []string) error {
+	api, err := getAPI(args[0])
+	if err != nil {
 		return err
 	}
-	return printOpenAPI3Schema(serviceRef, cliResource)
-}
-
-func printOpenAPI3Schema(svc *Service, resourceName string) error {
-	resource, err := svc.API.GetResource(resourceName)
+	resource, err := api.GetResource(args[1])
 	if err != nil {
 		return err
 	}
