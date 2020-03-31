@@ -37,10 +37,11 @@ type opSpec struct {
 }
 
 type shapeSpec struct {
-	Type      string                  `json:"type"`
-	Exception bool                    `json:"exception"`
-	Required  []string                `json:"required"`
-	Members   map[string]shapeRefSpec `json:"members"`
+	Type       string                  `json:"type"`
+	Exception  bool                    `json:"exception"`
+	Required   []string                `json:"required"`
+	Members    map[string]shapeRefSpec `json:"members"`
+	ListMember *shapeRefSpec           `json:"member",omitempty` // for list types
 }
 
 type apiSpec struct {
@@ -81,10 +82,10 @@ func apiFromSpec(spec *apiSpec) (*API, error) {
 	// Populate the base shape and operation maps
 	for shapeName, shapeSpec := range spec.Shapes {
 		shape := Shape{
-			Name:               shapeName,
-			Type:               shapeSpec.Type,
-			Fields:             make(map[string]*Shape, len(shapeSpec.Members)),
-			RequiredFieldNames: shapeSpec.Required,
+			Name:                shapeName,
+			Type:                shapeSpec.Type,
+			Members:             make(map[string]*Shape, len(shapeSpec.Members)),
+			RequiredMemberNames: shapeSpec.Required,
 		}
 		api.shapeMap[shapeName] = shape
 
@@ -100,12 +101,22 @@ func apiFromSpec(spec *apiSpec) (*API, error) {
 
 	// Set each shape's field references
 	for shapeName, shapeSpec := range spec.Shapes {
-		if len(shapeSpec.Members) == 0 {
-			continue
-		}
 		shape, found := api.shapeMap[shapeName]
 		if !found {
 			return nil, fmt.Errorf("expected to find shape %s in shapeMap", shapeName)
+		}
+		// List types are special...
+		if shapeSpec.ListMember != nil {
+			listMemberShapeName := *shapeSpec.ListMember.ShapeName
+			listMemberShape, found := api.shapeMap[listMemberShapeName]
+			if !found {
+				return nil, fmt.Errorf("expected to find member shape %s in shapeMap", listMemberShapeName)
+			}
+			shape.Members[listMemberShapeName] = &listMemberShape
+			continue
+		}
+		if len(shapeSpec.Members) == 0 {
+			continue
 		}
 		x := 0
 		for memberName, memberShapeRef := range shapeSpec.Members {
@@ -117,7 +128,7 @@ func apiFromSpec(spec *apiSpec) (*API, error) {
 			if !found {
 				return nil, fmt.Errorf("expected to find member shape %s in shapeMap", memberShapeName)
 			}
-			shape.Fields[memberName] = &memberShape
+			shape.Members[memberName] = &memberShape
 			x++
 		}
 	}

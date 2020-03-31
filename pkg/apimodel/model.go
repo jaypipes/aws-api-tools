@@ -7,14 +7,17 @@
 package apimodel
 
 import (
+	"fmt"
 	"strings"
+
+	"github.com/getkin/kin-openapi/openapi3"
 )
 
 type Shape struct {
-	Name               string
-	Type               string
-	Fields             map[string]*Shape
-	RequiredFieldNames []string
+	Name                string
+	Type                string
+	Members             map[string]*Shape
+	RequiredMemberNames []string
 }
 
 type Operation struct {
@@ -26,16 +29,10 @@ type Operation struct {
 	Errors     []*Shape
 }
 
-type Field struct {
-	Type       string
-	IsRequired bool
-	IsMutable  bool
-}
-
 type Resource struct {
 	SingularName string
 	PluralName   string
-	Fields       map[string]*Field
+	Properties   map[string]*openapi3.Schema
 }
 
 type API struct {
@@ -114,6 +111,15 @@ func (a *API) GetResources() []*Resource {
 		x++
 	}
 	return res
+}
+
+// GetResource returns a Resource with the specified name
+func (a *API) GetResource(resourceName string) (*Resource, error) {
+	r, found := a.resourceMap[resourceName]
+	if !found {
+		return nil, fmt.Errorf("no such resource '%s'", resourceName)
+	}
+	return r, nil
 }
 
 // GetObjects returns shapes that are *not* payloads, scalars, lists or

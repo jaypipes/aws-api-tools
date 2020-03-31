@@ -440,3 +440,63 @@ $ go run cmd/aws-api-tool/main.go api --service ecr payloads
 | UploadLayerPartResponse               |
 +---------------------------------------+
 ```
+
+#### Show OpenAPI3 Schema for API resource
+
+Use the `aws-api-tool schema openapi` command to display the OpenAPI3 Schema
+for a specific resource in an AWS Service API. Specify the service with the
+`--service` flag and the resource using the `--resource` flag:
+
+```
+$ aws-api-tool schema --service sqs --resource Queue openapi
+properties:
+  Attributes:
+    additionalProperties: true
+    type: object
+  QueueName:
+    type: string
+  QueueUrl:
+    type: string
+  tags:
+    additionalProperties: true
+    type: object
+type: object
+```
+
+```
+$ aws-api-tool schema --service sns --resource Topic openapi
+properties:
+  Attributes:
+    additionalProperties: true
+    type: object
+  Name:
+    type: string
+  Tags:
+    items:
+      properties:
+        Key:
+          type: string
+        Value:
+          type: string
+      type: object
+    type: array
+  TopicArn:
+    type: string
+type: object
+```
+
+Note that different AWS service APIs will represent the same things
+differently. An example of this is shown above where the AWS SQS Queue resource
+uses the lowercase name "tags" to refer to a simple `map[string]string` whereas
+the AWS SNS Topic resource uses the CamelCased name "Tags" and uses a list of
+objects with a "Key" and "Value" property.
+
+**NOTE**: By default, the `aws-api-tool schema openapi` command outputs the
+OpenAPI3 Schema as YAML. You can output condensed JSON instead using the
+`--output json` flag:
+
+
+```
+$ aws-api-tool schema --service sqs --resource Queue openapi --format json
+{"properties":{"Attributes":{"additionalProperties":true,"type":"object"},"QueueName":{"type":"string"},"QueueUrl":{"type":"string"},"tags":{"additionalProperties":true,"type":"object"}},"type":"object"}
+```

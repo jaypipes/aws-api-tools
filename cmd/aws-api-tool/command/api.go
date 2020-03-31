@@ -39,9 +39,10 @@ var apiInfoCmd = &cobra.Command{
 
 // apiOperationsCmd lists all operations for an AWS API service
 var apiOperationsCmd = &cobra.Command{
-	Use:   "operations",
-	Short: "lists Operations for an AWS API service",
-	RunE:  apiOperations,
+	Use:     "operations",
+	Aliases: []string{"ops"},
+	Short:   "lists Operations for an AWS API service",
+	RunE:    apiOperations,
 }
 
 // apiResourcesCmd lists all resource object types for an AWS API service
@@ -84,6 +85,13 @@ var apiListsCmd = &cobra.Command{
 	Use:   "lists",
 	Short: "lists List types for an AWS API service",
 	RunE:  apiLists,
+}
+
+// apiSchemaCmd shows a schema document for an AWS API service
+var apiSchemaCmd = &cobra.Command{
+	Use:   "schema",
+	Short: "shows schema information for an AWS service API",
+	RunE:  apiSchema,
 }
 
 func init() {
@@ -316,6 +324,31 @@ func apiLists(cmd *cobra.Command, args []string) error {
 }
 
 func printAPILists(svc *Service) {
+	lists := svc.API.GetLists()
+	headers := []string{"Name"}
+	rows := make([][]string, len(lists))
+	for x, list := range lists {
+		rows[x] = []string{list.Name}
+	}
+	noResults(rows)
+	sort.Slice(rows, func(i, j int) bool {
+		return rows[i][0] < rows[j][0]
+	})
+	table := tablewriter.NewWriter(os.Stdout)
+	table.SetHeader(headers)
+	table.AppendBulk(rows)
+	table.Render()
+}
+
+func apiSchema(cmd *cobra.Command, args []string) error {
+	if err := ensureService(); err != nil {
+		return err
+	}
+	printAPISchema(serviceRef)
+	return nil
+}
+
+func printAPISchema(svc *Service) {
 	lists := svc.API.GetLists()
 	headers := []string{"Name"}
 	rows := make([][]string, len(lists))

@@ -11,6 +11,7 @@ import (
 	"strings"
 
 	pluralize "github.com/gertd/go-pluralize"
+	"github.com/getkin/kin-openapi/openapi3"
 )
 
 // Many service APIs follow a pattern that we can use to determine top-level or
@@ -112,10 +113,10 @@ func getResources(api *API) (map[string]*Resource, error) {
 		resource := &Resource{
 			SingularName: singularName,
 			PluralName:   pluralName,
-			Fields:       map[string]*Field{},
+			Properties:   map[string]*openapi3.Schema{},
 		}
 		// Find the shape representing the input to the create operation and
-		// add fields from the input shape
+		// add a pointer to an openapi3.Schema describing the input shape
 		if createOp.Input != nil {
 			inShapeName := createOp.Input.Name
 			inShape, found := api.shapeMap[inShapeName]
@@ -125,12 +126,8 @@ func getResources(api *API) (map[string]*Resource, error) {
 			if inShape.Type != "structure" {
 				return nil, fmt.Errorf("expected to find a structure type for input shape %s but found %s", inShapeName, inShape.Type)
 			}
-			for fieldName, field := range inShape.Fields {
-				resource.Fields[fieldName] = &Field{
-					Type:       field.Type,
-					IsRequired: inStrings(fieldName, field.RequiredFieldNames),
-					IsMutable:  true,
-				}
+			for memberName, member := range inShape.Members {
+				resource.Properties[memberName] = shapeToOAI3Schema(member)
 			}
 		}
 		// Find the shape representing the ouput of the create operation and
@@ -140,22 +137,81 @@ func getResources(api *API) (map[string]*Resource, error) {
 			outShapeName := createOp.Output.Name
 			outShape, found := api.shapeMap[outShapeName]
 			if !found {
-				return nil, fmt.Errorf("expected to find input shape %s", outShapeName)
+				return nil, fmt.Errorf("expected to find output shape %s", outShapeName)
 			}
 			if outShape.Type != "structure" {
-				return nil, fmt.Errorf("expected to find a structure type for input shape %s but found %s", outShapeName, outShape.Type)
+				return nil, fmt.Errorf("expected to find a structure type for output shape %s but found %s", outShapeName, outShape.Type)
 			}
-			for fieldName, field := range outShape.Fields {
-				if _, found := resource.Fields[fieldName]; !found {
-					resource.Fields[fieldName] = &Field{
-						Type:       field.Type,
-						IsRequired: inStrings(field.Name, field.RequiredFieldNames),
-						IsMutable:  false,
+
+			var membersToProcess *map[string]*Shape = &outShape.Members
+
+			// Often (but annoyingly not always), the API's response will wrap
+			// the returned members with a single wrapper member named the same
+			// as the resource. For example, the EKS CreateCluster operation's
+			// output Shape looks like this:
+			//
+			// "CreateClusterResponse":{
+			//   "type":"structure",
+			//   "members":{
+			//     "cluster":{"shape":"Cluster"}
+			//   }
+			// },
+			//
+			// If this is the case, we go ahead and "flatten" things by
+			// processing the single member's members...
+			if len(outShape.Members) == 1 {
+				for memberShapeName, memberShape := range outShape.Members {
+					if strings.ToLower(singularName) == strings.ToLower(memberShapeName) {
+						membersToProcess = &memberShape.Members
+						break
 					}
+				}
+			}
+
+			for memberName, member := range *membersToProcess {
+				if _, found := resource.Properties[memberName]; !found {
+					resource.Properties[memberName] = shapeToOAI3Schema(member)
 				}
 			}
 		}
 		resources[objName] = resource
 	}
 	return resources, nil
+}
+
+func shapeToOAI3Schema(shape *Shape) *openapi3.Schema {
+	var schema *openapi3.Schema
+	switch shape.Type {
+	case "string":
+		schema = openapi3.NewStringSchema()
+	case "long", "integer":
+		schema = openapi3.NewInt64Schema()
+	case "blob":
+		schema = openapi3.NewBytesSchema()
+	case "boolean":
+		schema = openapi3.NewBoolSchema()
+	case "timestamp":
+		schema = openapi3.NewDateTimeSchema()
+	case "map":
+		schema = openapi3.NewObjectSchema().WithAnyAdditionalProperties()
+	case "list":
+		schema = openapi3.NewArraySchema()
+		for _, memberShape := range shape.Members {
+			itemsSchema := shapeToOAI3Schema(memberShape)
+			schema.WithItems(itemsSchema)
+			break
+		}
+	case "structure":
+		schema = openapi3.NewObjectSchema()
+		memberProps := map[string]*openapi3.Schema{}
+		for memberName, memberShape := range shape.Members {
+			memberProps[memberName] = shapeToOAI3Schema(memberShape)
+		}
+		schema.WithProperties(memberProps)
+	}
+	return schema
+}
+
+func (r *Resource) OpenAPI3Schema() *openapi3.Schema {
+	return openapi3.NewObjectSchema().WithProperties(r.Properties)
 }
