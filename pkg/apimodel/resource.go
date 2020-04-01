@@ -127,8 +127,12 @@ func getResources(api *API) (map[string]*Resource, error) {
 				return nil, fmt.Errorf("expected to find a structure type for input shape %s but found %s", inShapeName, inObj.Type)
 			}
 			for memberName, member := range inObj.Members {
-				resource.Properties[memberName] = objectToOAI3Schema(member)
+				resource.Properties[memberName] = member.OpenAPISchema()
 			}
+			// This is about as good as we're gonna get w.r.t. determining
+			// which fields of a resource are actually required... look at the
+			// Input shape's required fields, if any.
+			resource.Required = inObj.shapeSpec.Required
 		}
 		// Find the shape representing the ouput of the create operation and
 		// add fields from the output shape to the resource object, excluding
@@ -170,7 +174,7 @@ func getResources(api *API) (map[string]*Resource, error) {
 
 			for memberName, member := range *membersToProcess {
 				if _, found := resource.Properties[memberName]; !found {
-					resource.Properties[memberName] = objectToOAI3Schema(member)
+					resource.Properties[memberName] = member.OpenAPISchema()
 				}
 			}
 		}
@@ -179,12 +183,12 @@ func getResources(api *API) (map[string]*Resource, error) {
 	return resources, nil
 }
 
-func objectToOAI3Schema(object *Object) *openapi3.Schema {
+func (object *Object) OpenAPISchema() *openapi3.Schema {
 	var schema *openapi3.Schema
+	ss := object.shapeSpec
 	switch object.DataType {
 	case "string":
 		schema = openapi3.NewStringSchema()
-		ss := object.shapeSpec
 		if ss.Min != nil {
 			schema.WithMinLength(*ss.Min)
 		}
@@ -199,7 +203,6 @@ func objectToOAI3Schema(object *Object) *openapi3.Schema {
 		}
 	case "double":
 		schema = openapi3.NewFloat64Schema()
-		ss := object.shapeSpec
 		if ss.Min != nil {
 			schema.WithMin(float64(*ss.Min))
 		}
@@ -208,7 +211,6 @@ func objectToOAI3Schema(object *Object) *openapi3.Schema {
 		}
 	case "long", "integer":
 		schema = openapi3.NewInt64Schema()
-		ss := object.shapeSpec
 		if ss.Min != nil {
 			schema.WithMin(float64(*ss.Min))
 		}
@@ -226,11 +228,10 @@ func objectToOAI3Schema(object *Object) *openapi3.Schema {
 	case "list":
 		schema = openapi3.NewArraySchema()
 		for _, memberObj := range object.Members {
-			itemsSchema := objectToOAI3Schema(memberObj)
+			itemsSchema := memberObj.OpenAPISchema()
 			schema.WithItems(itemsSchema)
 			break
 		}
-		ss := object.shapeSpec
 		if ss.Max != nil {
 			schema.WithMaxItems(*ss.Max)
 		}
@@ -238,13 +239,20 @@ func objectToOAI3Schema(object *Object) *openapi3.Schema {
 		schema = openapi3.NewObjectSchema()
 		memberProps := map[string]*openapi3.Schema{}
 		for memberName, memberObj := range object.Members {
-			memberProps[memberName] = objectToOAI3Schema(memberObj)
+			memberProps[memberName] = memberObj.OpenAPISchema()
 		}
 		schema.WithProperties(memberProps)
+		if len(ss.Required) > 0 {
+			schema.Required = ss.Required
+		}
 	}
 	return schema
 }
 
 func (r *Resource) OpenAPI3Schema() *openapi3.Schema {
-	return openapi3.NewObjectSchema().WithProperties(r.Properties)
+	schema := openapi3.NewObjectSchema().WithProperties(r.Properties)
+	if len(r.Required) > 0 {
+		schema.Required = r.Required
+	}
+	return schema
 }

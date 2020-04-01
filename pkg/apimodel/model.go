@@ -42,6 +42,7 @@ type Resource struct {
 	SingularName string
 	PluralName   string
 	Properties   map[string]*openapi3.Schema
+	Required     []string
 }
 
 type API struct {

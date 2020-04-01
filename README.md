@@ -310,6 +310,8 @@ properties:
   tags:
     additionalProperties: true
     type: object
+required:
+- QueueName
 type: object
 ```
 
@@ -331,10 +333,15 @@ properties:
         Value:
           maxLength: 256
           type: string
+      required:
+      - Key
+      - Value
       type: object
     type: array
   TopicArn:
     type: string
+required:
+- Name
 type: object
 ```
 
