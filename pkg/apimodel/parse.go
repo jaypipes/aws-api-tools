@@ -11,6 +11,8 @@ import (
 	"fmt"
 	"io/ioutil"
 	"os"
+
+	oai "github.com/getkin/kin-openapi/openapi3"
 )
 
 type metadataSpec struct {
@@ -25,33 +27,34 @@ type shapeRefSpec struct {
 }
 
 type httpSpec struct {
-	Method     string `json:"method"`
-	RequestURI string `json:"requestUri"`
+	Method       string  `json:"method"`
+	RequestURI   *string `json:"requestUri"`
+	ResponseCode *int    `json:"responseCode"`
 }
 
 type opSpec struct {
-	HTTP   httpSpec       `json:"http"`
-	Input  shapeRefSpec   `json:"input"`
-	Output shapeRefSpec   `json:"output"`
-	Errors []shapeRefSpec `json:"errors"`
+	HTTP   *httpSpec       `json:"http",omitempty`
+	Input  *shapeRefSpec   `json:"input",omitempty`
+	Output *shapeRefSpec   `json:"output",omitempty`
+	Errors []*shapeRefSpec `json:"errors"`
 }
 
 type shapeSpec struct {
-	Type       string                  `json:"type"`
-	Exception  bool                    `json:"exception"`
-	Required   []string                `json:"required"`
-	Members    map[string]shapeRefSpec `json:"members"`
-	ListMember *shapeRefSpec           `json:"member",omitempty` // for list types
-	Min        *int64                  `json:"min",omitempty`
-	Max        *int64                  `json:"max",omitempty`
-	Pattern    *string                 `json:"pattern",omitempty`
-	Enum       []interface{}           `json:"enum"`
+	Type       string                   `json:"type"`
+	Exception  bool                     `json:"exception"`
+	Required   []string                 `json:"required"`
+	Members    map[string]*shapeRefSpec `json:"members"`
+	ListMember *shapeRefSpec            `json:"member",omitempty` // for list types
+	Min        *int64                   `json:"min",omitempty`
+	Max        *int64                   `json:"max",omitempty`
+	Pattern    *string                  `json:"pattern",omitempty`
+	Enum       []interface{}            `json:"enum"`
 }
 
 type apiSpec struct {
-	Metadata   metadataSpec         `json:"metadata"`
-	Operations map[string]opSpec    `json:"operations"`
-	Shapes     map[string]shapeSpec `json:"shapes"`
+	Metadata   metadataSpec          `json:"metadata"`
+	Operations map[string]*opSpec    `json:"operations"`
+	Shapes     map[string]*shapeSpec `json:"shapes"`
 }
 
 func parseFrom(modelPath string) (*apiSpec, error) {
@@ -67,120 +70,81 @@ func parseFrom(modelPath string) (*apiSpec, error) {
 }
 
 func (api *API) eval() error {
-	if len(api.objectMap) > 0 {
+	if api.swagger != nil {
 		return nil
 	}
+	api.objectMap = map[string]*Object{}
+
+	// Our goal is to convert the CORAL/upstream model into an OpenAPI3
+	// specification. We make a number of passes over the raw parsed JSON from
+	// the upstream model, attempting to identify what is a scalar, payload,
+	// list, etc as well as collating all the operations for the API.
+	swagger := &oai.Swagger{}
+	comps := oai.NewComponents()
+	comps.Schemas = map[string]*oai.SchemaRef{}
+	swagger.Components = comps
 	spec := api.apiSpec
-	api.objectMap = make(map[string]*Object, len(spec.Shapes))
-	api.opMap = make(map[string]Operation, len(spec.Operations))
-	api.payloadMap = map[string]*Object{}
-	api.scalarMap = map[string]*Object{}
-	api.exceptionMap = map[string]*Object{}
-	api.listMap = map[string]*Object{}
-	api.resourceMap = map[string]*Resource{}
+	api.payloads = map[string]bool{}
+	api.scalars = map[string]bool{}
+	api.exceptions = map[string]bool{}
+	api.lists = map[string]bool{}
 
 	// Populate the base object maps
 	for shapeName, shapeSpec := range spec.Shapes {
-		obj := Object{
-			Name:      shapeName,
-			Type:      ObjectTypeObject,
-			DataType:  shapeSpec.Type,
-			Members:   make(map[string]*Object, len(shapeSpec.Members)),
-			shapeSpec: shapeSpec,
-		}
+		comps.Schemas[shapeName] = &oai.SchemaRef{Value: shapeSpec.Schema(swagger, &spec.Shapes)}
 		// Determine simple types like scalars, lists and exceptions
 		if shapeSpec.Type != "structure" && shapeSpec.Type != "list" {
-			obj.Type = ObjectTypeScalar
-			api.scalarMap[shapeName] = &obj
+			api.scalars[shapeName] = true
+			api.objectMap[shapeName] = &Object{
+				Name:     shapeName,
+				Type:     ObjectTypeScalar,
+				DataType: shapeSpec.Type,
+			}
 		} else if shapeSpec.Type == "structure" && shapeSpec.Exception {
-			obj.Type = ObjectTypeException
-			api.exceptionMap[shapeName] = &obj
+			api.exceptions[shapeName] = true
+			api.objectMap[shapeName] = &Object{
+				Name:     shapeName,
+				Type:     ObjectTypeException,
+				DataType: shapeSpec.Type,
+			}
 		} else if shapeSpec.Type == "list" {
-			obj.Type = ObjectTypeList
-			api.listMap[shapeName] = &obj
+			api.lists[shapeName] = true
+			api.objectMap[shapeName] = &Object{
+				Name:     shapeName,
+				Type:     ObjectTypeList,
+				DataType: shapeSpec.Type,
+			}
 		}
-		api.objectMap[shapeName] = &obj
-
 	}
 
-	// Set each object's member references
-	for shapeName, shapeSpec := range spec.Shapes {
-		obj, found := api.objectMap[shapeName]
-		if !found {
-			return fmt.Errorf("expected to find object %s in objectMap", shapeName)
-		}
-		// List types are special...
-		if shapeSpec.ListMember != nil {
-			listMemberShapeName := *shapeSpec.ListMember.ShapeName
-			listMemberObj, found := api.objectMap[listMemberShapeName]
-			if !found {
-				return fmt.Errorf("expected to find member object %s in objectMap", listMemberShapeName)
-			}
-			obj.Members[listMemberShapeName] = listMemberObj
-			continue
-		}
-		if len(shapeSpec.Members) == 0 {
-			continue
-		}
-		x := 0
-		for memberName, memberShapeRef := range shapeSpec.Members {
-			if memberShapeRef.ShapeName == nil {
-				continue
-			}
-			memberShapeName := *memberShapeRef.ShapeName
-			memberObj, found := api.objectMap[memberShapeName]
-			if !found {
-				return fmt.Errorf("expected to find member object %s in objectMap", memberShapeName)
-			}
-			obj.Members[memberName] = memberObj
-			x++
-		}
-	}
 	for opName, opSpec := range spec.Operations {
-		op := Operation{
-			Name:       opName,
-			Method:     opSpec.HTTP.Method,
-			RequestURI: opSpec.HTTP.RequestURI,
+		op, err := opSpec.Operation(opName, swagger)
+		if err != nil {
+			return err
 		}
-		if opSpec.Input.ShapeName != nil {
+		swagger.AddOperation(*opSpec.HTTP.RequestURI, opSpec.HTTP.Method, op)
+		if opSpec.Input != nil && opSpec.Input.ShapeName != nil {
 			inShapeName := *opSpec.Input.ShapeName
-			inObj, ok := api.objectMap[inShapeName]
-			if !ok {
-				return fmt.Errorf("expected to find object %s", inShapeName)
+			shapeSpec := spec.Shapes[inShapeName]
+			api.payloads[inShapeName] = true
+			api.objectMap[inShapeName] = &Object{
+				Name:     inShapeName,
+				Type:     ObjectTypePayload,
+				DataType: shapeSpec.Type,
 			}
-			inObj.Type = ObjectTypePayload
-			api.payloadMap[inShapeName] = inObj
-			op.Input = inObj
 		}
-		if opSpec.Output.ShapeName != nil {
+		if opSpec.Output != nil && opSpec.Output.ShapeName != nil {
 			outShapeName := *opSpec.Output.ShapeName
-			outObj, ok := api.objectMap[outShapeName]
-			if !ok {
-				return fmt.Errorf("expected to find object %s", outShapeName)
+			shapeSpec := spec.Shapes[outShapeName]
+			api.payloads[outShapeName] = true
+			api.objectMap[outShapeName] = &Object{
+				Name:     outShapeName,
+				Type:     ObjectTypePayload,
+				DataType: shapeSpec.Type,
 			}
-			outObj.Type = ObjectTypePayload
-			api.payloadMap[outShapeName] = outObj
-			op.Output = outObj
 		}
-		if len(opSpec.Errors) > 0 {
-			errs := make([]*Object, len(opSpec.Errors))
-			for x, errShapeRef := range opSpec.Errors {
-				errShapeName := *errShapeRef.ShapeName
-				errObj, ok := api.objectMap[errShapeName]
-				if !ok {
-					return fmt.Errorf("expected to find object %s", errShapeName)
-				}
-				errs[x] = errObj
-			}
-			op.Errors = errs
-		}
-		api.opMap[opName] = op
 	}
 
-	resources, err := getResources(api)
-	if err != nil {
-		return err
-	}
-	api.resourceMap = resources
+	api.swagger = swagger
 	return nil
 }

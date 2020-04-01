@@ -58,14 +58,6 @@ var listObjectsCmd = &cobra.Command{
 	RunE:    listObjects,
 }
 
-// listResourcesCmd lists all resource object types for an AWS API service
-var listResourcesCmd = &cobra.Command{
-	Use:   "resources <api>",
-	Short: "lists Resource object types for an AWS API service",
-	Args:  requireAPIArg,
-	RunE:  listResources,
-}
-
 func init() {
 	listAPIsCmd.PersistentFlags().StringVarP(
 		&cliListAPIsFilter, "filter", "f", "", "Comma-delimited list of strings to filter APIs on.",
@@ -85,7 +77,6 @@ func init() {
 	rootCmd.AddCommand(listAPIsCmd)
 	rootCmd.AddCommand(listOperationsCmd)
 	rootCmd.AddCommand(listObjectsCmd)
-	rootCmd.AddCommand(listResourcesCmd)
 }
 
 func listAPIs(cmd *cobra.Command, args []string) error {
@@ -168,28 +159,6 @@ func listObjects(cmd *cobra.Command, args []string) error {
 			object.Type,
 			object.DataType,
 		}
-	}
-	noResults(rows)
-	sort.Slice(rows, func(i, j int) bool {
-		return rows[i][0] < rows[j][0]
-	})
-	table := tablewriter.NewWriter(os.Stdout)
-	table.SetHeader(headers)
-	table.AppendBulk(rows)
-	table.Render()
-	return nil
-}
-
-func listResources(cmd *cobra.Command, args []string) error {
-	api, err := getAPI(args[0])
-	if err != nil {
-		return err
-	}
-	resources := api.GetResources()
-	headers := []string{"Name"}
-	rows := make([][]string, len(resources))
-	for x, resource := range resources {
-		rows[x] = []string{resource.SingularName}
 	}
 	noResults(rows)
 	sort.Slice(rows, func(i, j int) bool {

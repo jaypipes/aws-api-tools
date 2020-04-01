@@ -7,7 +7,6 @@
 package command
 
 import (
-	"errors"
 	"fmt"
 
 	"github.com/ghodss/yaml"
@@ -17,19 +16,13 @@ import (
 var (
 	cliOutputFormat string
 )
-var requireAPIAndResourceArg = func(cmd *cobra.Command, args []string) error {
-	if len(args) != 2 {
-		return errors.New("requires an <api> and <resource> argument")
-	}
-	return nil
-}
 
-// schemaCmd shows a schema document for an AWS API service and resource
+// schemaCmd shows a schema document for an AWS API service
 var schemaCmd = &cobra.Command{
-	Use:   "schema <api> <resource>",
-	Short: "shows schema information for an AWS service API and resource",
-	Args:  requireAPIAndResourceArg,
-	RunE:  resourceSchema,
+	Use:   "schema <api>",
+	Short: "shows OpenAPI schema information for an AWS service API",
+	Args:  requireAPIArg,
+	RunE:  apiSchema,
 }
 
 func init() {
@@ -39,16 +32,12 @@ func init() {
 	rootCmd.AddCommand(schemaCmd)
 }
 
-func resourceSchema(cmd *cobra.Command, args []string) error {
+func apiSchema(cmd *cobra.Command, args []string) error {
 	api, err := getAPI(args[0])
 	if err != nil {
 		return err
 	}
-	resource, err := api.GetResource(args[1])
-	if err != nil {
-		return err
-	}
-	json, err := resource.OpenAPI3Schema().MarshalJSON()
+	json, err := api.Schema().MarshalJSON()
 	if err != nil {
 		return err
 	}

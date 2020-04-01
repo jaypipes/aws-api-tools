@@ -292,71 +292,133 @@ $ aws-api-tool list-objects sns --type scalar
 +---------------------------+-------------+-----------+
 ```
 
-#### Show OpenAPI3 Schema for API resource
+#### Show OpenAPI3 Schema (Swagger) for API
 
-Use the `aws-api-tool schema <api> <resource>` command to display the OpenAPI3
-Schema for a specific resource in an AWS Service API.
+Use the `aws-api-tool schema <api>` command to display the OpenAPI3 (Swagger)
+Schema for an AWS Service API.
 
-```
-$ aws-api-tool schema sqs Queue
-properties:
-  Attributes:
-    additionalProperties: true
-    type: object
-  QueueName:
-    type: string
-  QueueUrl:
-    type: string
-  tags:
-    additionalProperties: true
-    type: object
-required:
-- QueueName
-type: object
-```
+**NOTE**: The output of this command is voluminous, especially for the larger
+AWS APIs. We recommend piping the output to a file like so:
 
 ```
-$ aws-api-tool schema sns Topic
-properties:
-  Attributes:
-    additionalProperties: true
-    type: object
-  Name:
-    type: string
-  Tags:
-    items:
+$ aws-api-tool schema eks > eks.swagger.yaml
+```
+
+The `eks.swagger.yaml` file created from the above command will have the entire
+Swagger API document.
+
+```
+$ head -n20 eks.swagger.yaml
+components:
+  schemas:
+    AMITypes:
+      enum:
+      - AL2_x86_64
+      - AL2_x86_64_GPU
+      type: string
+    AutoScalingGroup:
       properties:
-        Key:
-          maxLength: 128
-          minLength: 1
+        name:
           type: string
-        Value:
-          maxLength: 256
-          type: string
-      required:
-      - Key
-      - Value
       type: object
-    type: array
-  TopicArn:
-    type: string
-required:
-- Name
-type: object
+    AutoScalingGroupList:
+      items:
+        properties:
+          name:
+            type: string
+        type: object
+      type: array
+    BadRequestException:
+    $ tail -n71 /tmp/eks.swagger.yaml
+```
+
+```
+$ tail -n71 eks.swagger.yaml
+  /tags/{resourceArn}:
+    delete:
+      operationId: UntagResource
+      requestBody:
+        content:
+          application/json:
+            schema:
+              properties:
+                resourceArn:
+                  type: string
+                tagKeys:
+                  items:
+                    maxLength: 128
+                    minLength: 1
+                    type: string
+                  maxItems: 50
+                  type: array
+              required:
+              - resourceArn
+              - tagKeys
+              type: object
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                type: object
+    get:
+      operationId: ListTagsForResource
+      requestBody:
+        content:
+          application/json:
+            schema:
+              properties:
+                resourceArn:
+                  type: string
+              required:
+              - resourceArn
+              type: object
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                properties:
+                  tags:
+                    additionalProperties: true
+                    type: object
+                type: object
+    post:
+      operationId: TagResource
+      requestBody:
+        content:
+          application/json:
+            schema:
+              properties:
+                resourceArn:
+                  type: string
+                tags:
+                  additionalProperties: true
+                  type: object
+              required:
+              - resourceArn
+              - tags
+              type: object
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                type: object
+
 ```
 
 Note that different AWS service APIs will represent the same things
-differently. An example of this is shown above where the AWS SQS Queue resource
-uses the lowercase name "tags" to refer to a simple `map[string]string` whereas
-the AWS SNS Topic resource uses the CamelCased name "Tags" and uses a list of
-objects with a "Key" and "Value" property.
+differently. An example of this is the AWS SQS Queue resource uses the
+lowercase name "tags" to refer to a simple `map[string]string` whereas the AWS
+SNS Topic resource uses the CamelCased name "Tags" and uses a list of objects
+with a "Key" and "Value" property.
 
-**NOTE**: By default, the `aws-api-tool schema <api> <resource>` command outputs the
+**NOTE**: By default, the `aws-api-tool schema <api>` command outputs the
 OpenAPI3 Schema as YAML. You can output condensed JSON instead using the
 `--output json` flag:
 
 
 ```
-$ aws-api-tool schema sqs Queue --format json
-{"properties":{"Attributes":{"additionalProperties":true,"type":"object"},"QueueName":{"type":"string"},"QueueUrl":{"type":"string"},"tags":{"additionalProperties":true,"type":"object"}},"type":"object"}
+$ aws-api-tool schema sqs Queue --format json > sqs.swagger.json
 ```

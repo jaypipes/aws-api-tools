@@ -31,7 +31,6 @@ func infoAPI(cmd *cobra.Command, args []string) error {
 		return err
 	}
 	ops := api.GetOperations(nil)
-	resources := api.GetResources()
 	objects := api.GetObjects(nil)
 	countScalars := 0
 	countPayloads := 0
@@ -53,7 +52,6 @@ func infoAPI(cmd *cobra.Command, args []string) error {
 	fmt.Printf("API version:      %s\n", api.Version)
 	fmt.Printf("Protocol:         %s\n", api.Protocol)
 	fmt.Printf("Total operations: %d\n", len(ops))
-	fmt.Printf("Total resources:  %d\n", len(resources))
 	fmt.Printf("Total objects:    %d\n", len(objects))
 	fmt.Printf("Total scalars:    %d\n", countScalars)
 	fmt.Printf("Total payloads:   %d\n", countPayloads)

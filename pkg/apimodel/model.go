@@ -7,10 +7,9 @@
 package apimodel
 
 import (
-	"fmt"
 	"strings"
 
-	"github.com/getkin/kin-openapi/openapi3"
+	oai "github.com/getkin/kin-openapi/openapi3"
 )
 
 const (
@@ -22,42 +21,28 @@ const (
 )
 
 type Object struct {
-	Name      string
-	Type      string
-	DataType  string
-	Members   map[string]*Object
-	shapeSpec shapeSpec
+	Name     string
+	Type     string
+	DataType string
 }
 
 type Operation struct {
-	Name       string
-	Method     string
-	RequestURI string
-	Input      *Object
-	Output     *Object
-	Errors     []*Object
-}
-
-type Resource struct {
-	SingularName string
-	PluralName   string
-	Properties   map[string]*openapi3.Schema
-	Required     []string
+	Name   string
+	Method string
 }
 
 type API struct {
-	Alias        string
-	FullName     string
-	Protocol     string
-	Version      string
-	apiSpec      *apiSpec
-	opMap        map[string]Operation
-	objectMap    map[string]*Object
-	payloadMap   map[string]*Object
-	scalarMap    map[string]*Object
-	exceptionMap map[string]*Object
-	listMap      map[string]*Object
-	resourceMap  map[string]*Resource
+	Alias      string
+	FullName   string
+	Protocol   string
+	Version    string
+	apiSpec    *apiSpec
+	objectMap  map[string]*Object
+	payloads   map[string]bool
+	scalars    map[string]bool
+	exceptions map[string]bool
+	lists      map[string]bool
+	swagger    *oai.Swagger
 }
 
 func New(alias string, modelPath string) (*API, error) {
@@ -79,53 +64,84 @@ type OperationFilter struct {
 	Prefixes []string
 }
 
-// GetOperations returns the Shapes in the API that are of a non-compound type
-// by returning a map of the shape name and its underlying simple type
+// GetOperations returns a map, keyed by the operation Name/ID, of OpenAPI
+// Operation structs
 func (a *API) GetOperations(filter *OperationFilter) []*Operation {
 	a.eval()
 	res := []*Operation{}
-	for opName, op := range a.opMap {
-		if filter != nil {
-			if len(filter.Methods) > 0 {
-				// Match on any of the supplied HTTP methods
-				if !inStrings(op.Method, filter.Methods) {
-					continue
-				}
+	filterMethods := []string{}
+	if filter != nil {
+		filterMethods = filter.Methods
+	}
+	for _, pathItem := range a.swagger.Paths {
+		if pathItem.Get != nil {
+			op := pathItem.Get
+			// Match on any of the supplied prefixes
+			if !hasAnyPrefix(op.OperationID, filter.Prefixes) {
+				continue
 			}
-			if len(filter.Prefixes) > 0 {
-				// Match on any of the supplied prefixes
-				if !hasAnyPrefix(opName, filter.Prefixes) {
-					continue
-				}
+			if inStrings("GET", filterMethods) {
+				res = append(res, &Operation{Name: op.OperationID, Method: "GET"})
+				continue
 			}
 		}
-		resOp := a.opMap[opName]
-		res = append(res, &resOp)
+		if pathItem.Head != nil {
+			op := pathItem.Get
+			// Match on any of the supplied prefixes
+			if !hasAnyPrefix(op.OperationID, filter.Prefixes) {
+				continue
+			}
+			if inStrings("HEAD", filterMethods) {
+				res = append(res, &Operation{Name: op.OperationID, Method: "HEAD"})
+				continue
+			}
+		}
+		if pathItem.Post != nil {
+			op := pathItem.Get
+			// Match on any of the supplied prefixes
+			if !hasAnyPrefix(op.OperationID, filter.Prefixes) {
+				continue
+			}
+			if inStrings("POST", filterMethods) {
+				res = append(res, &Operation{Name: op.OperationID, Method: "POST"})
+				continue
+			}
+		}
+		if pathItem.Put != nil {
+			op := pathItem.Get
+			// Match on any of the supplied prefixes
+			if !hasAnyPrefix(op.OperationID, filter.Prefixes) {
+				continue
+			}
+			if inStrings("PUT", filterMethods) {
+				res = append(res, &Operation{Name: op.OperationID, Method: "PUT"})
+				continue
+			}
+		}
+		if pathItem.Delete != nil {
+			op := pathItem.Get
+			// Match on any of the supplied prefixes
+			if !hasAnyPrefix(op.OperationID, filter.Prefixes) {
+				continue
+			}
+			if inStrings("DELETE", filterMethods) {
+				res = append(res, &Operation{Name: op.OperationID, Method: "DELETE"})
+				continue
+			}
+		}
+		if pathItem.Patch != nil {
+			op := pathItem.Get
+			// Match on any of the supplied prefixes
+			if !hasAnyPrefix(op.OperationID, filter.Prefixes) {
+				continue
+			}
+			if inStrings("PATCH", filterMethods) {
+				res = append(res, &Operation{Name: op.OperationID, Method: "PATCH"})
+				continue
+			}
+		}
 	}
 	return res
-}
-
-// GetResources returns objects that have been identified as top-level resource
-// structures for the API.
-func (a *API) GetResources() []*Resource {
-	a.eval()
-	res := make([]*Resource, len(a.resourceMap))
-	x := 0
-	for _, resource := range a.resourceMap {
-		res[x] = resource
-		x++
-	}
-	return res
-}
-
-// GetResource returns a Resource with the specified name
-func (a *API) GetResource(resourceName string) (*Resource, error) {
-	a.eval()
-	r, found := a.resourceMap[resourceName]
-	if !found {
-		return nil, fmt.Errorf("no such resource '%s'", resourceName)
-	}
-	return r, nil
 }
 
 type ObjectFilter struct {
@@ -155,6 +171,11 @@ func (a *API) GetObjects(filter *ObjectFilter) []*Object {
 		res = append(res, object)
 	}
 	return res
+}
+
+func (a *API) Schema() *oai.Swagger {
+	a.eval()
+	return a.swagger
 }
 
 func inStrings(subject string, collection []string) bool {
