@@ -325,8 +325,11 @@ properties:
     items:
       properties:
         Key:
+          maxLength: 128
+          minLength: 1
           type: string
         Value:
+          maxLength: 256
           type: string
       type: object
     type: array

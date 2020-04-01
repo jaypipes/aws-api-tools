@@ -22,11 +22,11 @@ const (
 )
 
 type Object struct {
-	Name                string
-	Type                string
-	DataType            string
-	Members             map[string]*Object
-	RequiredMemberNames []string
+	Name      string
+	Type      string
+	DataType  string
+	Members   map[string]*Object
+	shapeSpec shapeSpec
 }
 
 type Operation struct {

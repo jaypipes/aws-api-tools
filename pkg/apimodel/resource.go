@@ -184,8 +184,28 @@ func objectToOAI3Schema(object *Object) *openapi3.Schema {
 	switch object.DataType {
 	case "string":
 		schema = openapi3.NewStringSchema()
+		ss := object.shapeSpec
+		if ss.Min != nil {
+			schema.WithMinLength(*ss.Min)
+		}
+		if ss.Max != nil {
+			schema.WithMaxLength(*ss.Max)
+		}
+		if ss.Pattern != nil {
+			schema.WithPattern(*ss.Pattern)
+		}
+		if len(ss.Enum) > 0 {
+			schema.WithEnum(ss.Enum...)
+		}
 	case "long", "integer":
 		schema = openapi3.NewInt64Schema()
+		ss := object.shapeSpec
+		if ss.Min != nil {
+			schema.WithMin(float64(*ss.Min))
+		}
+		if ss.Max != nil {
+			schema.WithMax(float64(*ss.Max))
+		}
 	case "blob":
 		schema = openapi3.NewBytesSchema()
 	case "boolean":
@@ -200,6 +220,10 @@ func objectToOAI3Schema(object *Object) *openapi3.Schema {
 			itemsSchema := objectToOAI3Schema(memberObj)
 			schema.WithItems(itemsSchema)
 			break
+		}
+		ss := object.shapeSpec
+		if ss.Max != nil {
+			schema.WithMaxItems(*ss.Max)
 		}
 	case "structure":
 		schema = openapi3.NewObjectSchema()

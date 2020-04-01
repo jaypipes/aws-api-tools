@@ -42,6 +42,10 @@ type shapeSpec struct {
 	Required   []string                `json:"required"`
 	Members    map[string]shapeRefSpec `json:"members"`
 	ListMember *shapeRefSpec           `json:"member",omitempty` // for list types
+	Min        *int64                  `json:"min",omitempty`
+	Max        *int64                  `json:"max",omitempty`
+	Pattern    *string                 `json:"pattern",omitempty`
+	Enum       []interface{}           `json:"enum"`
 }
 
 type apiSpec struct {
@@ -78,11 +82,11 @@ func (api *API) eval() error {
 	// Populate the base object maps
 	for shapeName, shapeSpec := range spec.Shapes {
 		obj := Object{
-			Name:                shapeName,
-			Type:                ObjectTypeObject,
-			DataType:            shapeSpec.Type,
-			Members:             make(map[string]*Object, len(shapeSpec.Members)),
-			RequiredMemberNames: shapeSpec.Required,
+			Name:      shapeName,
+			Type:      ObjectTypeObject,
+			DataType:  shapeSpec.Type,
+			Members:   make(map[string]*Object, len(shapeSpec.Members)),
+			shapeSpec: shapeSpec,
 		}
 		// Determine simple types like scalars, lists and exceptions
 		if shapeSpec.Type != "structure" && shapeSpec.Type != "list" {
