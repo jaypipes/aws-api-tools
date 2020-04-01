@@ -197,6 +197,15 @@ func objectToOAI3Schema(object *Object) *openapi3.Schema {
 		if len(ss.Enum) > 0 {
 			schema.WithEnum(ss.Enum...)
 		}
+	case "double":
+		schema = openapi3.NewFloat64Schema()
+		ss := object.shapeSpec
+		if ss.Min != nil {
+			schema.WithMin(float64(*ss.Min))
+		}
+		if ss.Max != nil {
+			schema.WithMax(float64(*ss.Max))
+		}
 	case "long", "integer":
 		schema = openapi3.NewInt64Schema()
 		ss := object.shapeSpec
