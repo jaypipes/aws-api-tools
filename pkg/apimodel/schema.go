@@ -20,10 +20,11 @@ func (opSpec *opSpec) Operation(opName string, api *oai.Swagger) (*oai.Operation
 	// add a pointer to an oai.Schema describing the input shape
 	if opSpec.Input != nil {
 		inShapeName := *opSpec.Input.ShapeName
-		inShapeSchemaRef, found := api.Components.Schemas[inShapeName]
+		_, found := api.Components.Schemas[inShapeName]
 		if !found {
 			return nil, fmt.Errorf("expected to find input shape schema ref %s", inShapeName)
 		}
+		inShapeSchemaRef := oai.NewSchemaRef("#/components/schemas/"+inShapeName, nil)
 		reqBody := oai.NewRequestBody().WithJSONSchemaRef(inShapeSchemaRef)
 		op.RequestBody = &oai.RequestBodyRef{Value: reqBody}
 	}
@@ -32,7 +33,7 @@ func (opSpec *opSpec) Operation(opName string, api *oai.Swagger) (*oai.Operation
 	// fields already added from the input
 	if opSpec.Output != nil {
 		outShapeName := *opSpec.Output.ShapeName
-		outShapeSchemaRef, found := api.Components.Schemas[outShapeName]
+		_, found := api.Components.Schemas[outShapeName]
 		if !found {
 			return nil, fmt.Errorf("expected to find output shape schema ref %s", outShapeName)
 		}
@@ -40,6 +41,7 @@ func (opSpec *opSpec) Operation(opName string, api *oai.Swagger) (*oai.Operation
 		if opSpec.HTTP.ResponseCode != nil {
 			successRespCode = *opSpec.HTTP.ResponseCode
 		}
+		outShapeSchemaRef := oai.NewSchemaRef("#/components/schemas/"+outShapeName, nil)
 		op.AddResponse(successRespCode, oai.NewResponse().WithJSONSchemaRef(outShapeSchemaRef))
 
 		if len(opSpec.Errors) > 0 {
@@ -124,8 +126,9 @@ func (ss *shapeSpec) Schema(api *oai.Swagger, shapes *map[string]*shapeSpec) *oa
 			}
 			if memberShape.Type == "structure" && api != nil {
 				refMemberShapeName := *memberShapeRef.ShapeName
-				refSchema, refFound := api.Components.Schemas[refMemberShapeName]
+				_, refFound := shapeMap[refMemberShapeName]
 				if refFound {
+					refSchema := oai.NewSchemaRef("#/components/schemas/"+refMemberShapeName, nil)
 					schema.WithPropertyRef(memberName, refSchema)
 					continue
 				}

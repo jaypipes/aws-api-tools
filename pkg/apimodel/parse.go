@@ -91,7 +91,7 @@ func (api *API) eval() error {
 
 	// Populate the base object maps
 	for shapeName, shapeSpec := range spec.Shapes {
-		comps.Schemas[shapeName] = &oai.SchemaRef{Value: shapeSpec.Schema(swagger, &spec.Shapes)}
+		comps.Schemas[shapeName] = oai.NewSchemaRef("", shapeSpec.Schema(swagger, &spec.Shapes))
 		// Determine simple types like scalars, lists and exceptions
 		if shapeSpec.Type != "structure" && shapeSpec.Type != "list" {
 			api.scalars[shapeName] = true
