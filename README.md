@@ -329,11 +329,24 @@ components:
         type: object
       type: array
     BadRequestException:
-    $ tail -n71 /tmp/eks.swagger.yaml
 ```
 
 ```
-$ tail -n71 eks.swagger.yaml
+$ tail -n54 eks.swagger.yaml
+  /clusters/{name}/updates/{updateId}:
+    get:
+      operationId: DescribeUpdate
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/DescribeUpdateRequest'
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/DescribeUpdateResponse'
   /tags/{resourceArn}:
     delete:
       operationId: UntagResource
@@ -341,71 +354,39 @@ $ tail -n71 eks.swagger.yaml
         content:
           application/json:
             schema:
-              properties:
-                resourceArn:
-                  type: string
-                tagKeys:
-                  items:
-                    maxLength: 128
-                    minLength: 1
-                    type: string
-                  maxItems: 50
-                  type: array
-              required:
-              - resourceArn
-              - tagKeys
-              type: object
+              $ref: '#/components/schemas/UntagResourceRequest'
       responses:
         "200":
           content:
             application/json:
               schema:
-                type: object
+                $ref: '#/components/schemas/UntagResourceResponse'
     get:
       operationId: ListTagsForResource
       requestBody:
         content:
           application/json:
             schema:
-              properties:
-                resourceArn:
-                  type: string
-              required:
-              - resourceArn
-              type: object
+              $ref: '#/components/schemas/ListTagsForResourceRequest'
       responses:
         "200":
           content:
             application/json:
               schema:
-                properties:
-                  tags:
-                    additionalProperties: true
-                    type: object
-                type: object
+                $ref: '#/components/schemas/ListTagsForResourceResponse'
     post:
       operationId: TagResource
       requestBody:
         content:
           application/json:
             schema:
-              properties:
-                resourceArn:
-                  type: string
-                tags:
-                  additionalProperties: true
-                  type: object
-              required:
-              - resourceArn
-              - tags
-              type: object
+              $ref: '#/components/schemas/TagResourceRequest'
       responses:
         "200":
           content:
             application/json:
               schema:
-                type: object
-
+                $ref: '#/components/schemas/TagResourceResponse'
 ```
 
 Note that different AWS service APIs will represent the same things
