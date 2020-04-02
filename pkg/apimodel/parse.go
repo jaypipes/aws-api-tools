@@ -122,7 +122,17 @@ func (api *API) eval() error {
 		if err != nil {
 			return err
 		}
-		swagger.AddOperation(*opSpec.HTTP.RequestURI, opSpec.HTTP.Method, op)
+		// See https://github.com/OAI/OpenAPI-Specification/issues/1635#issuecomment-607444697
+		// Some AWS APIs (those that are of the "query" protocol, only really
+		// use a single HTTP verb and URI (usually /) and vary operations by
+		// the "action" parameter. Therefore, for these APIs, we embed a
+		// fragment into the URI in order to allow OpenAPI/Swagger to include
+		// these as separate operations.
+		reqURI := *opSpec.HTTP.RequestURI
+		if api.Protocol == "query" {
+			reqURI += "#action=" + opName
+		}
+		swagger.AddOperation(reqURI, opSpec.HTTP.Method, op)
 		if opSpec.Input != nil && opSpec.Input.ShapeName != nil {
 			inShapeName := *opSpec.Input.ShapeName
 			shapeSpec := spec.Shapes[inShapeName]
