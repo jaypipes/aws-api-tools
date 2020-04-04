@@ -57,16 +57,35 @@ type apiSpec struct {
 	Shapes     map[string]*shapeSpec `json:"shapes"`
 }
 
-func parseFrom(modelPath string) (*apiSpec, error) {
+type shapeDocSpec struct {
+	Base *string           `json:"base"`
+	Refs map[string]string `json:"refs"`
+}
+
+type docSpec struct {
+	Service    string                   `json:"service"`
+	Operations map[string]string        `json:"operations"`
+	Shapes     map[string]*shapeDocSpec `json:"shapes"`
+}
+
+func parseFrom(modelPath string, docPath string) (*apiSpec, *docSpec, error) {
 	if _, err := os.Stat(modelPath); os.IsNotExist(err) {
-		return nil, fmt.Errorf("expected to find %s", modelPath)
+		return nil, nil, fmt.Errorf("expected to find %s", modelPath)
 	}
-	var spec apiSpec
+	if _, err := os.Stat(docPath); os.IsNotExist(err) {
+		return nil, nil, fmt.Errorf("expected to find %s", docPath)
+	}
+	var apiSpec apiSpec
 	b, err := ioutil.ReadFile(modelPath)
-	if err = json.Unmarshal(b, &spec); err != nil {
-		return nil, err
+	if err = json.Unmarshal(b, &apiSpec); err != nil {
+		return nil, nil, err
 	}
-	return &spec, nil
+	var docSpec docSpec
+	b, err = ioutil.ReadFile(docPath)
+	if err = json.Unmarshal(b, &docSpec); err != nil {
+		return nil, nil, err
+	}
+	return &apiSpec, &docSpec, nil
 }
 
 func (api *API) eval() error {

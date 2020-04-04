@@ -37,6 +37,7 @@ type API struct {
 	Protocol   string
 	Version    string
 	apiSpec    *apiSpec
+	docSpec    *docSpec
 	objectMap  map[string]*Object
 	payloads   map[string]bool
 	scalars    map[string]bool
@@ -45,17 +46,18 @@ type API struct {
 	swagger    *oai.Swagger
 }
 
-func New(alias string, modelPath string) (*API, error) {
-	spec, err := parseFrom(modelPath)
+func New(alias string, modelPath string, docPath string) (*API, error) {
+	apiSpec, docSpec, err := parseFrom(modelPath, docPath)
 	if err != nil {
 		return nil, err
 	}
 	return &API{
 		Alias:    alias,
-		FullName: spec.Metadata.FullName,
-		Version:  spec.Metadata.APIVersion,
-		Protocol: spec.Metadata.Protocol,
-		apiSpec:  spec,
+		FullName: apiSpec.Metadata.FullName,
+		Version:  apiSpec.Metadata.APIVersion,
+		Protocol: apiSpec.Metadata.Protocol,
+		apiSpec:  apiSpec,
+		docSpec:  docSpec,
 	}, nil
 }
 
@@ -176,8 +178,9 @@ func (a *API) GetObjects(filter *ObjectFilter) []*Object {
 func (a *API) Schema() *oai.Swagger {
 	a.eval()
 	info := &oai.Info{
-		Title:   a.FullName,
-		Version: a.Version,
+		Title:       a.FullName,
+		Version:     a.Version,
+		Description: a.docSpec.Service,
 	}
 	exts := map[string]interface{}{}
 	info.ExtensionProps = oai.ExtensionProps{exts}

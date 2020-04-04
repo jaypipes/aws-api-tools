@@ -131,7 +131,8 @@ func getAPIFromVersionPath(
 	// api-2.json, docs-2.json, etc. We want to grab the API model from the
 	// api-2.json file
 	modelPath := filepath.Join(versionPath, "api-2.json")
-	return apimodel.New(alias, modelPath)
+	docPath := filepath.Join(versionPath, "docs-2.json")
+	return apimodel.New(alias, modelPath, docPath)
 }
 
 // cloneSDKRepo git clone's the aws-sdk-go source repo into the cache and
