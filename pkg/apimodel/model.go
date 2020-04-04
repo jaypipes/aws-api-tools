@@ -175,6 +175,16 @@ func (a *API) GetObjects(filter *ObjectFilter) []*Object {
 
 func (a *API) Schema() *oai.Swagger {
 	a.eval()
+	info := &oai.Info{
+		Title:   a.FullName,
+		Version: a.Version,
+	}
+	exts := map[string]interface{}{}
+	info.ExtensionProps = oai.ExtensionProps{exts}
+	info.ExtensionProps.Extensions["x-aws-api-alias"] = a.Alias
+	info.ExtensionProps.Extensions["x-aws-api-protocol"] = a.Protocol
+	a.swagger.Info = info
+	a.swagger.OpenAPI = "3.0.0"
 	return a.swagger
 }
 
