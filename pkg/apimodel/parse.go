@@ -137,7 +137,8 @@ func (api *API) eval() error {
 	}
 
 	for opName, opSpec := range spec.Operations {
-		op, err := opSpec.Operation(opName, swagger)
+		doc := api.docSpec.Operations[opName]
+		op, err := opSpec.Operation(opName, doc, swagger)
 		if err != nil {
 			return err
 		}

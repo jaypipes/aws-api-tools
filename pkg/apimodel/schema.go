@@ -12,9 +12,10 @@ import (
 	oai "github.com/getkin/kin-openapi/openapi3"
 )
 
-func (opSpec *opSpec) Operation(opName string, api *oai.Swagger) (*oai.Operation, error) {
+func (opSpec *opSpec) Operation(opName string, doc string, api *oai.Swagger) (*oai.Operation, error) {
 	op := oai.NewOperation()
 	op.OperationID = opName
+	op.Description = doc
 
 	// Find the shape representing the input to the create operation and
 	// add a pointer to an oai.Schema describing the input shape
