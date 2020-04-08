@@ -54,7 +54,12 @@ func (opSpec *opSpec) Operation(opName string, doc string, api *oai.Swagger) (*o
 	return op, nil
 }
 
-func (ss *shapeSpec) Schema(api *oai.Swagger, shapes *map[string]*shapeSpec) *oai.Schema {
+func (ss *shapeSpec) Schema(
+	shapeName string,
+	api *oai.Swagger,
+	shapes *map[string]*shapeSpec,
+	visitedMemberShapeNames []string,
+) *oai.Schema {
 	var schema *oai.Schema
 	switch ss.Type {
 	case "string":
@@ -105,11 +110,12 @@ func (ss *shapeSpec) Schema(api *oai.Swagger, shapes *map[string]*shapeSpec) *oa
 		}
 		shapeMap := *shapes
 		listMemberShapeRef := ss.ListMember
-		listMemberShape, found := shapeMap[*listMemberShapeRef.ShapeName]
+		refListMemberShapeName := *listMemberShapeRef.ShapeName
+		listMemberShape, found := shapeMap[refListMemberShapeName]
 		if !found {
-			panic("expected to find member shape " + *listMemberShapeRef.ShapeName)
+			panic("expected to find member shape " + refListMemberShapeName)
 		}
-		itemsSchema := listMemberShape.Schema(api, shapes)
+		itemsSchema := listMemberShape.Schema(refListMemberShapeName, api, shapes, visitedMemberShapeNames)
 		schema.WithItems(itemsSchema)
 		if ss.Max != nil {
 			schema.WithMaxItems(*ss.Max)
@@ -121,12 +127,18 @@ func (ss *shapeSpec) Schema(api *oai.Swagger, shapes *map[string]*shapeSpec) *oa
 		}
 		shapeMap := *shapes
 		for memberName, memberShapeRef := range ss.Members {
-			memberShape, found := shapeMap[*memberShapeRef.ShapeName]
+			refMemberShapeName := *memberShapeRef.ShapeName
+			visitedMemberShapeNames = append(visitedMemberShapeNames, refMemberShapeName)
+			memberShape, found := shapeMap[refMemberShapeName]
 			if !found {
 				panic("expected to find member shape " + memberName)
 			}
-			if memberShape.Type == "structure" && api != nil {
-				refMemberShapeName := *memberShapeRef.ShapeName
+			if memberShape.Type == "structure" && api != nil ||
+				inStrings(refMemberShapeName, visitedMemberShapeNames) {
+				// If member shape name is in the list of visited member shape
+				// names, we detected cycle in member relationships... prevent
+				// infinite recursion by just injecting a JSON Reference to the
+				// member schema.
 				_, refFound := shapeMap[refMemberShapeName]
 				if refFound {
 					refSchema := oai.NewSchemaRef("#/components/schemas/"+refMemberShapeName, nil)
@@ -134,7 +146,7 @@ func (ss *shapeSpec) Schema(api *oai.Swagger, shapes *map[string]*shapeSpec) *oa
 					continue
 				}
 			}
-			schema.WithProperty(memberName, memberShape.Schema(api, shapes))
+			schema.WithProperty(memberName, memberShape.Schema(refMemberShapeName, api, shapes, visitedMemberShapeNames))
 		}
 		if len(ss.Required) > 0 {
 			schema.Required = ss.Required
