@@ -71,77 +71,49 @@ type OperationFilter struct {
 func (a *API) GetOperations(filter *OperationFilter) []*Operation {
 	a.eval()
 	res := []*Operation{}
+	filterPrefixes := []string{}
+	if filter != nil {
+		filterPrefixes = filter.Prefixes
+	}
 	filterMethods := []string{}
 	if filter != nil {
 		filterMethods = filter.Methods
 	}
 	for _, pathItem := range a.swagger.Paths {
+		var op *oai.Operation
+		var meth string
 		if pathItem.Get != nil {
-			op := pathItem.Get
-			// Match on any of the supplied prefixes
-			if !hasAnyPrefix(op.OperationID, filter.Prefixes) {
-				continue
-			}
-			if inStrings("GET", filterMethods) {
-				res = append(res, &Operation{Name: op.OperationID, Method: "GET"})
-				continue
-			}
+			op = pathItem.Get
+			meth = "GET"
 		}
 		if pathItem.Head != nil {
-			op := pathItem.Get
-			// Match on any of the supplied prefixes
-			if !hasAnyPrefix(op.OperationID, filter.Prefixes) {
-				continue
-			}
-			if inStrings("HEAD", filterMethods) {
-				res = append(res, &Operation{Name: op.OperationID, Method: "HEAD"})
-				continue
-			}
+			op = pathItem.Head
+			meth = "HEAD"
 		}
 		if pathItem.Post != nil {
-			op := pathItem.Get
-			// Match on any of the supplied prefixes
-			if !hasAnyPrefix(op.OperationID, filter.Prefixes) {
-				continue
-			}
-			if inStrings("POST", filterMethods) {
-				res = append(res, &Operation{Name: op.OperationID, Method: "POST"})
-				continue
-			}
+			op = pathItem.Post
+			meth = "POST"
 		}
 		if pathItem.Put != nil {
-			op := pathItem.Get
-			// Match on any of the supplied prefixes
-			if !hasAnyPrefix(op.OperationID, filter.Prefixes) {
-				continue
-			}
-			if inStrings("PUT", filterMethods) {
-				res = append(res, &Operation{Name: op.OperationID, Method: "PUT"})
-				continue
-			}
+			op = pathItem.Put
+			meth = "PUT"
 		}
 		if pathItem.Delete != nil {
-			op := pathItem.Get
-			// Match on any of the supplied prefixes
-			if !hasAnyPrefix(op.OperationID, filter.Prefixes) {
-				continue
-			}
-			if inStrings("DELETE", filterMethods) {
-				res = append(res, &Operation{Name: op.OperationID, Method: "DELETE"})
-				continue
-			}
+			op = pathItem.Delete
+			meth = "DELETE"
 		}
 		if pathItem.Patch != nil {
-			op := pathItem.Get
-			// Match on any of the supplied prefixes
-			if !hasAnyPrefix(op.OperationID, filter.Prefixes) {
-				continue
-			}
-			if inStrings("PATCH", filterMethods) {
-				res = append(res, &Operation{Name: op.OperationID, Method: "PATCH"})
-				continue
-			}
+			op = pathItem.Patch
+			meth = "PATCH"
 		}
+		// Match on any of the supplied prefixes
+		if len(filterPrefixes) > 0 && !hasAnyPrefix(op.OperationID, filterPrefixes) {
+			continue
+		}
+		if len(filterMethods) > 0 && inStrings(meth, filterMethods) {
+			continue
+		}
+		res = append(res, &Operation{Name: op.OperationID, Method: meth})
 	}
 	return res
 }
