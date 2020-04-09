@@ -45,8 +45,8 @@ type shapeSpec struct {
 	Required   []string                 `json:"required"`
 	Members    map[string]*shapeRefSpec `json:"members"`
 	ListMember *shapeRefSpec            `json:"member",omitempty` // for list types
-	Min        *int64                   `json:"min",omitempty`
-	Max        *int64                   `json:"max",omitempty`
+	Min        *float64                 `json:"min",omitempty`
+	Max        *float64                 `json:"max",omitempty`
 	Pattern    *string                  `json:"pattern",omitempty`
 	Enum       []interface{}            `json:"enum"`
 }

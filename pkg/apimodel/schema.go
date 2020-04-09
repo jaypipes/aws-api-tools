@@ -65,10 +65,10 @@ func (ss *shapeSpec) Schema(
 	case "string":
 		schema = oai.NewStringSchema()
 		if ss.Min != nil {
-			schema.WithMinLength(*ss.Min)
+			schema.WithMinLength(int64(*ss.Min))
 		}
 		if ss.Max != nil {
-			schema.WithMaxLength(*ss.Max)
+			schema.WithMaxLength(int64(*ss.Max))
 		}
 		if ss.Pattern != nil {
 			schema.WithPattern(*ss.Pattern)
@@ -79,18 +79,18 @@ func (ss *shapeSpec) Schema(
 	case "double":
 		schema = oai.NewFloat64Schema()
 		if ss.Min != nil {
-			schema.WithMin(float64(*ss.Min))
+			schema.WithMin(*ss.Min)
 		}
 		if ss.Max != nil {
-			schema.WithMax(float64(*ss.Max))
+			schema.WithMax(*ss.Max)
 		}
 	case "long", "integer":
 		schema = oai.NewInt64Schema()
 		if ss.Min != nil {
-			schema.WithMin(float64(*ss.Min))
+			schema.WithMin(*ss.Min)
 		}
 		if ss.Max != nil {
-			schema.WithMax(float64(*ss.Max))
+			schema.WithMax(*ss.Max)
 		}
 	case "blob":
 		schema = oai.NewBytesSchema()
@@ -118,7 +118,7 @@ func (ss *shapeSpec) Schema(
 		itemsSchema := listMemberShape.Schema(refListMemberShapeName, api, shapes, visitedMemberShapeNames)
 		schema.WithItems(itemsSchema)
 		if ss.Max != nil {
-			schema.WithMaxItems(*ss.Max)
+			schema.WithMaxItems(int64(*ss.Max))
 		}
 	case "structure":
 		schema = oai.NewObjectSchema()
