@@ -119,12 +119,21 @@ func (api *API) eval() error {
 				Type:     ObjectTypeScalar,
 				DataType: shapeSpec.Type,
 			}
-		} else if shapeSpec.Type == "structure" && shapeSpec.Exception {
-			api.exceptions[shapeName] = true
-			api.objectMap[shapeName] = &Object{
-				Name:     shapeName,
-				Type:     ObjectTypeException,
-				DataType: shapeSpec.Type,
+		} else if shapeSpec.Type == "structure" {
+			if shapeSpec.Exception {
+				api.exceptions[shapeName] = true
+				api.objectMap[shapeName] = &Object{
+					Name:     shapeName,
+					Type:     ObjectTypeException,
+					DataType: shapeSpec.Type,
+				}
+			} else {
+				// Just a plain ol' object
+				api.objectMap[shapeName] = &Object{
+					Name:     shapeName,
+					Type:     ObjectTypeObject,
+					DataType: shapeSpec.Type,
+				}
 			}
 		} else if shapeSpec.Type == "list" {
 			api.lists[shapeName] = true
