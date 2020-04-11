@@ -32,38 +32,28 @@ func (api *API) eval() error {
 
 	// Populate the base object maps
 	for shapeName, shapeSpec := range spec.Shapes {
+		var objType string
 		comps.Schemas[shapeName] = oai.NewSchemaRef("", shapeSpec.Schema(shapeName, swagger, &spec.Shapes, []string{}))
 		// Determine simple types like scalars, lists and exceptions
 		if shapeSpec.Type != "structure" && shapeSpec.Type != "list" {
 			api.scalars[shapeName] = true
-			api.objectMap[shapeName] = &Object{
-				Name:     shapeName,
-				Type:     ObjectTypeScalar,
-				DataType: shapeSpec.Type,
-			}
+			objType = ObjectTypeScalar
 		} else if shapeSpec.Type == "structure" {
 			if shapeSpec.Exception {
 				api.exceptions[shapeName] = true
-				api.objectMap[shapeName] = &Object{
-					Name:     shapeName,
-					Type:     ObjectTypeException,
-					DataType: shapeSpec.Type,
-				}
+				objType = ObjectTypeException
 			} else {
 				// Just a plain ol' object
-				api.objectMap[shapeName] = &Object{
-					Name:     shapeName,
-					Type:     ObjectTypeObject,
-					DataType: shapeSpec.Type,
-				}
+				objType = ObjectTypeObject
 			}
 		} else if shapeSpec.Type == "list" {
 			api.lists[shapeName] = true
-			api.objectMap[shapeName] = &Object{
-				Name:     shapeName,
-				Type:     ObjectTypeList,
-				DataType: shapeSpec.Type,
-			}
+			objType = ObjectTypeList
+		}
+		api.objectMap[shapeName] = &Object{
+			Name:     shapeName,
+			Type:     objType,
+			DataType: shapeSpec.Type,
 		}
 	}
 
