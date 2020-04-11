@@ -36,7 +36,8 @@ func ensureSDKRepo() (string, error) {
 }
 
 type APIFilter struct {
-	anyMatch []string
+	anyMatch         []string
+	anyProtocolMatch []string
 }
 
 // getAPIs returns a slice of pointer to apimodel.API objects representing the
@@ -66,8 +67,7 @@ func getAPIs(
 		if !fi.IsDir() {
 			continue
 		}
-		// Filter just the services we're interested in
-		if filter != nil {
+		if filter != nil && len(filter.anyMatch) > 0 {
 			if !inStrings(fname, filter.anyMatch) {
 				continue
 			}
@@ -80,6 +80,11 @@ func getAPIs(
 		api, err := getAPIFromVersionPath(fname, versionPath)
 		if err != nil {
 			return apis, err
+		}
+		if filter != nil && len(filter.anyProtocolMatch) > 0 {
+			if !inStrings(api.Protocol, filter.anyProtocolMatch) {
+				continue
+			}
 		}
 		apis = append(apis, api)
 	}

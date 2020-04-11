@@ -23,15 +23,15 @@ Use the `aws-api-tool list-apis` command to list AWS services:
 
 ```
 $ aws-api-tool list-apis
-+------------------------------+-------------+------------------------------------+
-|            ALIAS             | API VERSION |             FULL NAME              |
-+------------------------------+-------------+------------------------------------+
-| AWSMigrationHub              | 2017-05-31  | AWS Migration Hub                  |
-| accessanalyzer               | 2019-11-01  | Access Analyzer                    |
++------------------------------+-------------+-----------------+------------------------------------+
+|            ALIAS             | API VERSION | PROTOCOL/SCHEME |             FULL NAME              |
++------------------------------+-------------+-----------------+------------------------------------+
+| AWSMigrationHub              | 2017-05-31  | json            | AWS Migration Hub                  |
+| accessanalyzer               | 2019-11-01  | rest-json       | Access Analyzer                    |
 <snip>
-| workspaces                   | 2015-04-08  | Amazon WorkSpaces                  |
-| xray                         | 2016-04-12  | AWS X-Ray                          |
-+------------------------------+-------------+------------------------------------+
+| workspaces                   | 2015-04-08  | json            | Amazon WorkSpaces                  |
+| xray                         | 2016-04-12  | rest-json       | AWS X-Ray                          |
++------------------------------+-------------+-----------------+------------------------------------+
 ```
 
 You can filter the results using the `--filter` flag, which accepts a
@@ -39,12 +39,47 @@ comma-delimited string of strings to match for the service's alias:
 
 ```
 $ aws-api-tool list-apis --filter ebs,sdb
-+-------+-------------+----------------------------+
-| ALIAS | API VERSION |         FULL NAME          |
-+-------+-------------+----------------------------+
-| ebs   | 2019-11-02  | Amazon Elastic Block Store |
-| sdb   | 2009-04-15  | Amazon SimpleDB            |
-+-------+-------------+----------------------------+
++-------+-------------+-----------------+----------------------------+
+| ALIAS | API VERSION | PROTOCOL/SCHEME |         FULL NAME          |
++-------+-------------+-----------------+----------------------------+
+| ebs   | 2019-11-02  | rest-json       | Amazon Elastic Block Store |
+| sdb   | 2009-04-15  | query           | Amazon SimpleDB            |
++-------+-------------+-----------------+----------------------------+
+```
+
+You can filter the results to only APIs that use a particular protocol/scheme
+with the `--protocol` flag, which accepts a comma-delimited string of strings
+to match on the service's protocol/scheme:
+
+```
+$ aws-api-tool list-apis --protocol query
++------------------------+-------------+-----------------+--------------------------------+
+|         ALIAS          | API VERSION | PROTOCOL/SCHEME |           FULL NAME            |
++------------------------+-------------+-----------------+--------------------------------+
+| autoscaling            | 2011-01-01  | query           | Auto Scaling                   |
+| cloudformation         | 2010-05-15  | query           | AWS CloudFormation             |
+| cloudsearch            | 2013-01-01  | query           | Amazon CloudSearch             |
+| docdb                  | 2014-10-31  | query           | Amazon DocumentDB with MongoDB |
+|                        |             |                 | compatibility                  |
+| elasticache            | 2015-02-02  | query           | Amazon ElastiCache             |
+| elasticbeanstalk       | 2010-12-01  | query           | AWS Elastic Beanstalk          |
+| elasticloadbalancing   | 2012-06-01  | query           | Elastic Load Balancing         |
+| elasticloadbalancingv2 | 2015-12-01  | query           | Elastic Load Balancing         |
+| email                  | 2010-12-01  | query           | Amazon Simple Email Service    |
+| iam                    | 2010-05-08  | query           | AWS Identity and Access        |
+|                        |             |                 | Management                     |
+| importexport           | 2010-06-01  | query           | AWS Import/Export              |
+| monitoring             | 2010-08-01  | query           | Amazon CloudWatch              |
+| neptune                | 2014-10-31  | query           | Amazon Neptune                 |
+| rds                    | 2014-10-31  | query           | Amazon Relational Database     |
+|                        |             |                 | Service                        |
+| redshift               | 2012-12-01  | query           | Amazon Redshift                |
+| sdb                    | 2009-04-15  | query           | Amazon SimpleDB                |
+| sns                    | 2010-03-31  | query           | Amazon Simple Notification     |
+|                        |             |                 | Service                        |
+| sqs                    | 2012-11-05  | query           | Amazon Simple Queue Service    |
+| sts                    | 2011-06-15  | query           | AWS Security Token Service     |
++------------------------+-------------+-----------------+--------------------------------+
 ```
 
 ### Get summary information about an API

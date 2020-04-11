@@ -19,6 +19,7 @@ import (
 
 var (
 	cliListAPIsFilter                 string
+	cliListAPIsProtocolFilter         string
 	cliListOperationsHTTPMethodFilter string
 	cliListOperationsPrefixFilter     string
 	cliListObjectsTypeFilter          string
@@ -62,6 +63,9 @@ func init() {
 	listAPIsCmd.PersistentFlags().StringVarP(
 		&cliListAPIsFilter, "filter", "f", "", "Comma-delimited list of strings to filter APIs on.",
 	)
+	listAPIsCmd.PersistentFlags().StringVar(
+		&cliListAPIsProtocolFilter, "protocol", "", "Comma-delimited list of protocol/schemes to filter APIs on.",
+	)
 	listOperationsCmd.PersistentFlags().StringVarP(
 		&cliListOperationsPrefixFilter, "prefix", "p", "", "Comma-delimited list of string prefixes to filter operations by.",
 	)
@@ -81,21 +85,26 @@ func init() {
 
 func listAPIs(cmd *cobra.Command, args []string) error {
 	var filter *APIFilter
-	if cliListAPIsFilter != "" {
-		filter = &APIFilter{
-			anyMatch: strings.Split(cliListAPIsFilter, ","),
+	if cliListAPIsFilter != "" || cliListAPIsProtocolFilter != "" {
+		filter = &APIFilter{}
+		if cliListAPIsFilter != "" {
+			filter.anyMatch = strings.Split(cliListAPIsFilter, ",")
+		}
+		if cliListAPIsProtocolFilter != "" {
+			filter.anyProtocolMatch = strings.Split(cliListAPIsProtocolFilter, ",")
 		}
 	}
 	apis, err := getAPIs(filter)
 	if err != nil {
 		return err
 	}
-	headers := []string{"Alias", "API Version", "Full Name"}
+	headers := []string{"Alias", "API Version", "Protocol/Scheme", "Full Name"}
 	rows := make([][]string, len(apis))
 	for x, api := range apis {
 		rows[x] = []string{
 			api.Alias,
 			api.Version,
+			api.Protocol,
 			api.FullName,
 		}
 	}
