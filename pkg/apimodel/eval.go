@@ -14,48 +14,43 @@ func (api *API) eval() error {
 	if api.swagger != nil {
 		return nil
 	}
-	api.objectMap = map[string]*Object{}
 
 	// Our goal is to convert the CORAL/upstream model into an OpenAPI3
 	// specification. We make a number of passes over the raw parsed JSON from
 	// the upstream model, attempting to identify what is a scalar, payload,
 	// list, etc as well as collating all the operations for the API.
-	swagger := &oai.Swagger{}
-	comps := oai.NewComponents()
-	comps.Schemas = map[string]*oai.SchemaRef{}
-	swagger.Components = comps
+	swagger := newSwagger()
 	spec := api.apiSpec
-	api.payloads = map[string]bool{}
-	api.scalars = map[string]bool{}
-	api.exceptions = map[string]bool{}
-	api.lists = map[string]bool{}
+	objectMap := map[string]*Object{}
+	comps := &swagger.Components
 
-	// Populate the base object maps
 	for shapeName, shapeSpec := range spec.Shapes {
 		var objType string
-		comps.Schemas[shapeName] = oai.NewSchemaRef("", shapeSpec.Schema(shapeName, swagger, &spec.Shapes, []string{}))
 		// Determine simple types like scalars, lists and exceptions
 		if shapeSpec.Type != "structure" && shapeSpec.Type != "list" {
-			api.scalars[shapeName] = true
 			objType = ObjectTypeScalar
 		} else if shapeSpec.Type == "structure" {
 			if shapeSpec.Exception {
-				api.exceptions[shapeName] = true
 				objType = ObjectTypeException
 			} else {
 				// Just a plain ol' object
 				objType = ObjectTypeObject
 			}
 		} else if shapeSpec.Type == "list" {
-			api.lists[shapeName] = true
 			objType = ObjectTypeList
 		}
-		api.objectMap[shapeName] = &Object{
+		objectMap[shapeName] = &Object{
 			Name:     shapeName,
 			Type:     objType,
 			DataType: shapeSpec.Type,
 		}
+		schema, err := api.newSchema(shapeName, shapeSpec, []string{})
+		if err != nil {
+			return err
+		}
+		comps.Schemas[shapeName] = oai.NewSchemaRef("", schema)
 	}
+	api.objectMap = objectMap
 
 	for opName, opSpec := range spec.Operations {
 		doc := api.docSpec.Operations[opName]
@@ -74,8 +69,7 @@ func (api *API) eval() error {
 		if opSpec.Input != nil && opSpec.Input.ShapeName != nil {
 			inShapeName := *opSpec.Input.ShapeName
 			shapeSpec := spec.Shapes[inShapeName]
-			api.payloads[inShapeName] = true
-			api.objectMap[inShapeName] = &Object{
+			objectMap[inShapeName] = &Object{
 				Name:     inShapeName,
 				Type:     ObjectTypePayload,
 				DataType: shapeSpec.Type,
@@ -84,8 +78,7 @@ func (api *API) eval() error {
 		if opSpec.Output != nil && opSpec.Output.ShapeName != nil {
 			outShapeName := *opSpec.Output.ShapeName
 			shapeSpec := spec.Shapes[outShapeName]
-			api.payloads[outShapeName] = true
-			api.objectMap[outShapeName] = &Object{
+			objectMap[outShapeName] = &Object{
 				Name:     outShapeName,
 				Type:     ObjectTypePayload,
 				DataType: shapeSpec.Type,

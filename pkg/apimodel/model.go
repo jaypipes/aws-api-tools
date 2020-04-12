@@ -32,18 +32,14 @@ type Operation struct {
 }
 
 type API struct {
-	Alias      string
-	FullName   string
-	Protocol   string
-	Version    string
-	apiSpec    *apiSpec
-	docSpec    *docSpec
-	objectMap  map[string]*Object
-	payloads   map[string]bool
-	scalars    map[string]bool
-	exceptions map[string]bool
-	lists      map[string]bool
-	swagger    *oai.Swagger
+	Alias     string
+	FullName  string
+	Protocol  string
+	Version   string
+	apiSpec   *apiSpec
+	docSpec   *docSpec
+	objectMap map[string]*Object
+	swagger   *oai.Swagger
 }
 
 func New(alias string, modelPath string, docPath string) (*API, error) {
