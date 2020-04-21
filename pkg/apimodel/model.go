@@ -7,6 +7,7 @@
 package apimodel
 
 import (
+	"fmt"
 	"strings"
 
 	oai "github.com/getkin/kin-openapi/openapi3"
@@ -65,7 +66,10 @@ type OperationFilter struct {
 // GetOperations returns a map, keyed by the operation Name/ID, of OpenAPI
 // Operation structs
 func (a *API) GetOperations(filter *OperationFilter) []*Operation {
-	a.eval()
+	if err := a.eval(); err != nil {
+		fmt.Printf("ERROR evaluating API: %v\n", err)
+		return nil
+	}
 	res := []*Operation{}
 	filterPrefixes := []string{}
 	if filter != nil {
@@ -121,7 +125,10 @@ type ObjectFilter struct {
 
 // GetObjects returns objects that match any of the supplied filter
 func (a *API) GetObjects(filter *ObjectFilter) []*Object {
-	a.eval()
+	if err := a.eval(); err != nil {
+		fmt.Printf("ERROR evaluating API: %v\n", err)
+		return nil
+	}
 	res := []*Object{}
 	for objectName, object := range a.objectMap {
 		if filter != nil {
@@ -144,7 +151,10 @@ func (a *API) GetObjects(filter *ObjectFilter) []*Object {
 }
 
 func (a *API) Schema() *oai.Swagger {
-	a.eval()
+	if err := a.eval(); err != nil {
+		fmt.Printf("ERROR evaluating API: %v\n", err)
+		return nil
+	}
 	info := &oai.Info{
 		Title:       a.FullName,
 		Version:     a.Version,

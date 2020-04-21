@@ -60,12 +60,26 @@ func (opSpec *opSpec) Operation(opName string, doc string, api *oai.Swagger, api
 				if !found {
 					return nil, fmt.Errorf("expected to find error shape %s", errShapeName)
 				}
-				if errShape.Error == nil {
-					return nil, fmt.Errorf("expected to find non-nil Error field in error shape %s", errShapeName)
-				}
-				errShapeSchemaRef := oai.NewSchemaRef("#/components/schemas/"+errShapeName, nil)
 				errRespCode := 400
-				if errShape.Error.HTTPStatusCode != nil {
+				errShapeSchemaRef := oai.NewSchemaRef("#/components/schemas/"+errShapeName, nil)
+				if errShape.Error == nil {
+					// Some older XML APIs like S3 do not have an Error field
+					// in the shape spec. Instead, the shape spec will have no
+					// members, no HTTP response code, nothing but the name of
+					// the error.
+					//
+					// For example:
+					//
+					// "NoSuchKey":{
+					//   "type":"structure",
+					//   "members":{
+					//   },
+					//   "exception":true
+					// },
+					//
+					// In these cases, we just need to use a generic 400 HTTP
+					// status code (even though many are actually 404s)
+				} else if errShape.Error.HTTPStatusCode != nil {
 					errRespCode = *errShape.Error.HTTPStatusCode
 				}
 				schemasWithCode, exists := codeSchemaMap[errRespCode]
