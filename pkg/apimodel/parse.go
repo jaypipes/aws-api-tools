@@ -37,9 +37,16 @@ type opSpec struct {
 	Errors []*shapeRefSpec `json:"errors"`
 }
 
+type errShapeSpec struct {
+	Code           string `json:"code"`
+	HTTPStatusCode *int   `json:"httpStatusCode"`
+	SenderFault    bool   `json:"senderFault"`
+}
+
 type shapeSpec struct {
 	Type       string                   `json:"type"`
 	Exception  bool                     `json:"exception"`
+	Error      *errShapeSpec            `json:"error,omitempty"`
 	Required   []string                 `json:"required"`
 	Members    map[string]*shapeRefSpec `json:"members"`
 	ListMember *shapeRefSpec            `json:"member,omitempty"` // for list types

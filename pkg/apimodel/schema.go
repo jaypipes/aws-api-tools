@@ -20,48 +20,6 @@ func newSwagger() *oai.Swagger {
 	return &swagger
 }
 
-func (opSpec *opSpec) Operation(opName string, doc string, api *oai.Swagger) (*oai.Operation, error) {
-	op := oai.NewOperation()
-	op.OperationID = opName
-	op.Description = doc
-
-	// Find the shape representing the input to the create operation and
-	// add a pointer to an oai.Schema describing the input shape
-	if opSpec.Input != nil {
-		inShapeName := *opSpec.Input.ShapeName
-		_, found := api.Components.Schemas[inShapeName]
-		if !found {
-			return nil, fmt.Errorf("expected to find input shape schema ref %s", inShapeName)
-		}
-		inShapeSchemaRef := oai.NewSchemaRef("#/components/schemas/"+inShapeName, nil)
-		reqBody := oai.NewRequestBody().WithJSONSchemaRef(inShapeSchemaRef)
-		op.RequestBody = &oai.RequestBodyRef{Value: reqBody}
-	}
-	// Find the shape representing the ouput of the create operation and
-	// add fields from the output shape to the resource object, excluding
-	// fields already added from the input
-	if opSpec.Output != nil {
-		outShapeName := *opSpec.Output.ShapeName
-		_, found := api.Components.Schemas[outShapeName]
-		if !found {
-			return nil, fmt.Errorf("expected to find output shape schema ref %s", outShapeName)
-		}
-		successRespCode := 200
-		if opSpec.HTTP.ResponseCode != nil {
-			successRespCode = *opSpec.HTTP.ResponseCode
-		}
-		outShapeSchemaRef := oai.NewSchemaRef("#/components/schemas/"+outShapeName, nil)
-		op.AddResponse(successRespCode, oai.NewResponse().WithJSONSchemaRef(outShapeSchemaRef))
-
-		if len(opSpec.Errors) > 0 {
-			// TODO(jaypipes): for each error shape, add a response to the
-			// Responses object
-
-		}
-	}
-	return op, nil
-}
-
 func newStringSchema(ss *shapeSpec) *oai.Schema {
 	schema := oai.NewStringSchema()
 	if ss.Min != nil {

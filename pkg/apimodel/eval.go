@@ -54,7 +54,7 @@ func (api *API) eval() error {
 
 	for opName, opSpec := range spec.Operations {
 		doc := api.docSpec.Operations[opName]
-		op, err := opSpec.Operation(opName, doc, swagger)
+		op, err := opSpec.Operation(opName, doc, swagger, spec)
 		if err != nil {
 			return err
 		}
