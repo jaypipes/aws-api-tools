@@ -132,7 +132,7 @@ func (api *API) newSchema(
 	switch ss.Type {
 	case "string":
 		return newStringSchema(ss), nil
-	case "double":
+	case "double", "float":
 		return newFloat64Schema(ss), nil
 	case "long", "integer":
 		return newInt64Schema(ss), nil
