@@ -120,6 +120,13 @@ func (api *API) newObjectSchema(
 	if len(ss.Required) > 0 {
 		schema.Required = ss.Required
 	}
+	// Helpfully decorate the object with an annotation if this object is an
+	// exception type
+	if ss.Exception {
+		exts := map[string]interface{}{}
+		schema.ExtensionProps = oai.ExtensionProps{exts}
+		schema.ExtensionProps.Extensions["x-aws-api-exception"] = true
+	}
 	return schema, nil
 }
 
