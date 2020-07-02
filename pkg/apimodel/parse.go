@@ -16,6 +16,7 @@ import (
 type metadataSpec struct {
 	APIVersion string `json:"apiVersion"`
 	FullName   string `json:"serviceFullName"`
+	Alias      string `json:"serviceId"`
 	Protocol   string `json:"protocol"`
 }
 

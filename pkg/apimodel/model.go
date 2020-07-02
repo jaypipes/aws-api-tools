@@ -33,6 +33,10 @@ type Operation struct {
 }
 
 type API struct {
+	// This is basically the package name in aws-sdk-go/services/
+	AliasLower string
+	// And this is the sometimes-titlecased alias from the metadata.json file
+	// in the aws-sdk-go/services/$alias_lower/$version directory
 	Alias     string
 	FullName  string
 	Protocol  string
@@ -49,7 +53,7 @@ func New(alias string, modelPath string, docPath string) (*API, error) {
 		return nil, err
 	}
 	return &API{
-		Alias:    alias,
+		Alias:    apiSpec.Metadata.Alias,
 		FullName: apiSpec.Metadata.FullName,
 		Version:  apiSpec.Metadata.APIVersion,
 		Protocol: apiSpec.Metadata.Protocol,
