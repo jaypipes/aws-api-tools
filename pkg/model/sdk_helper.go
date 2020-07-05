@@ -11,6 +11,8 @@ import (
 	"io/ioutil"
 	"os"
 	"path/filepath"
+
+	sdkmodelapi "github.com/aws/aws-sdk-go/private/model/api"
 )
 
 var (
@@ -20,17 +22,62 @@ var (
 	ErrNoValidVersionDirectory = errors.New(
 		"no valid version directories found",
 	)
+	ErrServiceNotFound = errors.New(
+		"no such service",
+	)
 )
 
 // SDKHelper is a helper struct that helps work with the aws-sdk-go models and
 // API model loader
 type SDKHelper struct {
 	basePath string
+	loader   *sdkmodelapi.Loader
 }
 
 // NewSDKHelper returns a new SDKHelper object
 func NewSDKHelper(basePath string) *SDKHelper {
-	return &SDKHelper{basePath}
+	return &SDKHelper{
+		basePath: basePath,
+		loader: &sdkmodelapi.Loader{
+			BaseImport:            basePath,
+			IgnoreUnsupportedAPIs: true,
+		},
+	}
+}
+
+// API returns the aws-sdk-go API model for a supplied service alias
+func (h *SDKHelper) API(serviceAlias string) (*sdkmodelapi.API, error) {
+	modelPath, _, err := h.ModelAndDocsPath(serviceAlias)
+	if err != nil {
+		return nil, err
+	}
+	apis, err := h.loader.Load([]string{modelPath})
+	if err != nil {
+		return nil, err
+	}
+	// apis is a map, keyed by the service alias, of pointers to aws-sdk-go
+	// model API objects
+	for _, api := range apis {
+		return api, nil
+	}
+	return nil, ErrServiceNotFound
+}
+
+// ModelAndDocsPath returns two string paths to the supplied service alias'
+// model and doc JSON files
+func (h *SDKHelper) ModelAndDocsPath(
+	serviceAlias string,
+) (string, string, error) {
+	apiVersion, err := h.APIVersion(serviceAlias)
+	if err != nil {
+		return "", "", err
+	}
+	versionPath := filepath.Join(
+		h.basePath, "models", "apis", serviceAlias, apiVersion,
+	)
+	modelPath := filepath.Join(versionPath, "api-2.json")
+	docsPath := filepath.Join(versionPath, "docs-2.json")
+	return modelPath, docsPath, nil
 }
 
 // APIVersion returns the API version (e.g. "2012-10-03") for a service API

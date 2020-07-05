@@ -74,12 +74,7 @@ func getAPIs(
 				continue
 			}
 		}
-		version, err := sdkHelper.APIVersion(fname)
-		if err != nil {
-			return apis, err
-		}
-		versionPath := filepath.Join(fp, version)
-		api, err := getAPIFromVersionPath(fname, versionPath)
+		api, err := apimodel.New(fname, sdkHelper)
 		if err != nil {
 			return apis, err
 		}
@@ -106,18 +101,6 @@ func getAPI(
 		return nil, fmt.Errorf("unknown API %s", alias)
 	}
 	return apis[0], nil
-}
-
-func getAPIFromVersionPath(
-	alias string,
-	versionPath string,
-) (*apimodel.API, error) {
-	// in each models/apis/$service/$version/ directory will exist files like
-	// api-2.json, docs-2.json, etc. We want to grab the API model from the
-	// api-2.json file
-	modelPath := filepath.Join(versionPath, "api-2.json")
-	docPath := filepath.Join(versionPath, "docs-2.json")
-	return apimodel.New(alias, modelPath, docPath)
 }
 
 // cloneSDKRepo git clone's the aws-sdk-go source repo into the cache and

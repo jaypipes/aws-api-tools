@@ -10,7 +10,10 @@ import (
 	"fmt"
 	"strings"
 
+	sdkmodelapi "github.com/aws/aws-sdk-go/private/model/api"
 	oai "github.com/getkin/kin-openapi/openapi3"
+
+	"github.com/jaypipes/aws-api-tools/pkg/model"
 )
 
 const (
@@ -45,10 +48,19 @@ type API struct {
 	docSpec   *docSpec
 	objectMap map[string]*Object
 	swagger   *oai.Swagger
+	sdkAPI    *sdkmodelapi.API
 }
 
-func New(alias string, modelPath string, docPath string) (*API, error) {
+func New(serviceAlias string, sdkHelper *model.SDKHelper) (*API, error) {
+	modelPath, docPath, err := sdkHelper.ModelAndDocsPath(serviceAlias)
+	if err != nil {
+		return nil, err
+	}
 	apiSpec, docSpec, err := parseFrom(modelPath, docPath)
+	if err != nil {
+		return nil, err
+	}
+	sdkAPI, err := sdkHelper.API(serviceAlias)
 	if err != nil {
 		return nil, err
 	}
@@ -59,6 +71,7 @@ func New(alias string, modelPath string, docPath string) (*API, error) {
 		Protocol: apiSpec.Metadata.Protocol,
 		apiSpec:  apiSpec,
 		docSpec:  docSpec,
+		sdkAPI:   sdkAPI,
 	}, nil
 }
 
