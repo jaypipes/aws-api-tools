@@ -14,6 +14,7 @@ import (
 	"path/filepath"
 
 	"github.com/jaypipes/aws-api-tools/pkg/apimodel"
+	"github.com/jaypipes/aws-api-tools/pkg/model"
 )
 
 const (
@@ -50,6 +51,7 @@ func getAPIs(
 	if err != nil {
 		return nil, err
 	}
+	sdkHelper := model.NewSDKHelper(sdkPath)
 	apis := []*apimodel.API{}
 
 	destPath := filepath.Join(sdkPath, "models", "apis")
@@ -72,7 +74,7 @@ func getAPIs(
 				continue
 			}
 		}
-		version, err := getAPIVersion(fp)
+		version, err := sdkHelper.APIVersion(fname)
 		if err != nil {
 			return apis, err
 		}
@@ -104,28 +106,6 @@ func getAPI(
 		return nil, fmt.Errorf("unknown API %s", alias)
 	}
 	return apis[0], nil
-}
-
-func getAPIVersion(apiPath string) (string, error) {
-	versionDirs, err := ioutil.ReadDir(apiPath)
-	if err != nil {
-		return "", err
-	}
-	for _, f := range versionDirs {
-		version := f.Name()
-		fp := filepath.Join(apiPath, version)
-		fi, err := os.Lstat(fp)
-		if err != nil {
-			return "", err
-		}
-		if !fi.IsDir() {
-			return "", fmt.Errorf("expected to find only directories in api model directory %s but found non-directory %s", apiPath, fp)
-		}
-		// TODO(jaypipes): handle more than one version? doesn't seem like
-		// there is ever more than one.
-		return version, nil
-	}
-	return "", fmt.Errorf("expected to find at least one directory in api model directory %s", apiPath)
 }
 
 func getAPIFromVersionPath(
