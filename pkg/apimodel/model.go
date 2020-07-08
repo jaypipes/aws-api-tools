@@ -10,7 +10,10 @@ import (
 	"fmt"
 	"strings"
 
+	sdkmodelapi "github.com/aws/aws-sdk-go/private/model/api"
 	oai "github.com/getkin/kin-openapi/openapi3"
+
+	"github.com/jaypipes/aws-api-tools/pkg/model"
 )
 
 const (
@@ -45,20 +48,30 @@ type API struct {
 	docSpec   *docSpec
 	objectMap map[string]*Object
 	swagger   *oai.Swagger
+	sdkAPI    *sdkmodelapi.API
 }
 
-func New(alias string, modelPath string, docPath string) (*API, error) {
+func New(serviceAlias string, sdkHelper *model.SDKHelper) (*API, error) {
+	modelPath, docPath, err := sdkHelper.ModelAndDocsPath(serviceAlias)
+	if err != nil {
+		return nil, err
+	}
 	apiSpec, docSpec, err := parseFrom(modelPath, docPath)
 	if err != nil {
 		return nil, err
 	}
+	sdkAPI, err := sdkHelper.API(serviceAlias)
+	if err != nil {
+		return nil, err
+	}
 	return &API{
-		Alias:    apiSpec.Metadata.Alias,
-		FullName: apiSpec.Metadata.FullName,
-		Version:  apiSpec.Metadata.APIVersion,
-		Protocol: apiSpec.Metadata.Protocol,
+		Alias:    sdkmodelapi.ServiceID(sdkAPI),
+		FullName: sdkAPI.Metadata.ServiceFullName,
+		Version:  sdkAPI.Metadata.APIVersion,
+		Protocol: sdkAPI.Metadata.Protocol,
 		apiSpec:  apiSpec,
 		docSpec:  docSpec,
+		sdkAPI:   sdkAPI,
 	}, nil
 }
 
@@ -70,10 +83,6 @@ type OperationFilter struct {
 // GetOperations returns a map, keyed by the operation Name/ID, of OpenAPI
 // Operation structs
 func (a *API) GetOperations(filter *OperationFilter) []*Operation {
-	if err := a.eval(); err != nil {
-		fmt.Printf("ERROR evaluating API: %v\n", err)
-		return nil
-	}
 	res := []*Operation{}
 	filterPrefixes := []string{}
 	if filter != nil {
@@ -83,41 +92,19 @@ func (a *API) GetOperations(filter *OperationFilter) []*Operation {
 	if filter != nil {
 		filterMethods = filter.Methods
 	}
-	for _, pathItem := range a.swagger.Paths {
-		var op *oai.Operation
-		var meth string
-		if pathItem.Get != nil {
-			op = pathItem.Get
-			meth = "GET"
+	for _, sdkOp := range a.sdkAPI.OperationList() {
+		if sdkOp.HTTP.Method == "" {
+			continue
 		}
-		if pathItem.Head != nil {
-			op = pathItem.Head
-			meth = "HEAD"
-		}
-		if pathItem.Post != nil {
-			op = pathItem.Post
-			meth = "POST"
-		}
-		if pathItem.Put != nil {
-			op = pathItem.Put
-			meth = "PUT"
-		}
-		if pathItem.Delete != nil {
-			op = pathItem.Delete
-			meth = "DELETE"
-		}
-		if pathItem.Patch != nil {
-			op = pathItem.Patch
-			meth = "PATCH"
-		}
+		meth := sdkOp.HTTP.Method
 		// Match on any of the supplied prefixes
-		if len(filterPrefixes) > 0 && !hasAnyPrefix(op.OperationID, filterPrefixes) {
+		if len(filterPrefixes) > 0 && !hasAnyPrefix(sdkOp.Name, filterPrefixes) {
 			continue
 		}
-		if len(filterMethods) > 0 && inStrings(meth, filterMethods) {
+		if len(filterMethods) > 0 && !inStrings(meth, filterMethods) {
 			continue
 		}
-		res = append(res, &Operation{Name: op.OperationID, Method: meth})
+		res = append(res, &Operation{Name: sdkOp.Name, Method: meth})
 	}
 	return res
 }

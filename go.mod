@@ -3,6 +3,7 @@ module github.com/jaypipes/aws-api-tools
 go 1.14
 
 require (
+	github.com/aws/aws-sdk-go v1.33.1
 	github.com/gertd/go-pluralize v0.1.1
 	github.com/getkin/kin-openapi v0.3.0
 	github.com/ghodss/yaml v1.0.0
