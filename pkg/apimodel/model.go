@@ -83,10 +83,6 @@ type OperationFilter struct {
 // GetOperations returns a map, keyed by the operation Name/ID, of OpenAPI
 // Operation structs
 func (a *API) GetOperations(filter *OperationFilter) []*Operation {
-	if err := a.eval(); err != nil {
-		fmt.Printf("ERROR evaluating API: %v\n", err)
-		return nil
-	}
 	res := []*Operation{}
 	filterPrefixes := []string{}
 	if filter != nil {
@@ -96,41 +92,19 @@ func (a *API) GetOperations(filter *OperationFilter) []*Operation {
 	if filter != nil {
 		filterMethods = filter.Methods
 	}
-	for _, pathItem := range a.swagger.Paths {
-		var op *oai.Operation
-		var meth string
-		if pathItem.Get != nil {
-			op = pathItem.Get
-			meth = "GET"
+	for _, sdkOp := range a.sdkAPI.OperationList() {
+		if sdkOp.HTTP.Method == "" {
+			continue
 		}
-		if pathItem.Head != nil {
-			op = pathItem.Head
-			meth = "HEAD"
-		}
-		if pathItem.Post != nil {
-			op = pathItem.Post
-			meth = "POST"
-		}
-		if pathItem.Put != nil {
-			op = pathItem.Put
-			meth = "PUT"
-		}
-		if pathItem.Delete != nil {
-			op = pathItem.Delete
-			meth = "DELETE"
-		}
-		if pathItem.Patch != nil {
-			op = pathItem.Patch
-			meth = "PATCH"
-		}
+		meth := sdkOp.HTTP.Method
 		// Match on any of the supplied prefixes
-		if len(filterPrefixes) > 0 && !hasAnyPrefix(op.OperationID, filterPrefixes) {
+		if len(filterPrefixes) > 0 && !hasAnyPrefix(sdkOp.Name, filterPrefixes) {
 			continue
 		}
-		if len(filterMethods) > 0 && inStrings(meth, filterMethods) {
+		if len(filterMethods) > 0 && !inStrings(meth, filterMethods) {
 			continue
 		}
-		res = append(res, &Operation{Name: op.OperationID, Method: meth})
+		res = append(res, &Operation{Name: sdkOp.Name, Method: meth})
 	}
 	return res
 }
