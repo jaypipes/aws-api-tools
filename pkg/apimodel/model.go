@@ -65,10 +65,10 @@ func New(serviceAlias string, sdkHelper *model.SDKHelper) (*API, error) {
 		return nil, err
 	}
 	return &API{
-		Alias:    apiSpec.Metadata.Alias,
-		FullName: apiSpec.Metadata.FullName,
-		Version:  apiSpec.Metadata.APIVersion,
-		Protocol: apiSpec.Metadata.Protocol,
+		Alias:    sdkmodelapi.ServiceID(sdkAPI),
+		FullName: sdkAPI.Metadata.ServiceFullName,
+		Version:  sdkAPI.Metadata.APIVersion,
+		Protocol: sdkAPI.Metadata.Protocol,
 		apiSpec:  apiSpec,
 		docSpec:  docSpec,
 		sdkAPI:   sdkAPI,
